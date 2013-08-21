@@ -1,20 +1,15 @@
 #!/usr/bin/perl
-#record.plx
+#zeroconf_init.plx
 use warnings;
 use strict;
 
-
-#retrieve mac address via ifconfig:
-my @ifconfig = `ifconfig eth0`;
-$_ = $ifconfig[0];
-my $local_mac = s/^.*(HWaddr\s+)//g;
-
-#set hostname to mac adress, to ensure uniqueness:
-#`hostname $local_mac`;
+=introcomment
+This determines which of the active recording units should attain master status, and will be run during boot sequenze after the hostname has been checked and set.
+=cut
 
 #browse for devices running the avahi daemon:
 my @avahi_result = `avahi-browse -at`;
-#setup containers to store mac addresses and the four final digits of them
+#setup containers to store mac addresses and the four final digits of them.
 my @valid_mac;
 my @valid_mac_final;
 
