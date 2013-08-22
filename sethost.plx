@@ -9,10 +9,11 @@ This small script sets the hostname of the recording unit if it's not equal to i
 #retrieve mac address via ifconfig:
 my @ifconfig = `ifconfig eth0`;
 $_ = $ifconfig[0];
-s/^.*(HWaddr\s+)|://g;
+s/^.*(HWaddr\s+)|:|\s*//g;
 
 if `hostname` ne $_ {
 #set hostname to mac address, to ensure uniqueness:
 	`echo "$_" > /etc/hostname`;
-	`reboot`;
+	`/etc/init.d/hostname.sh start`;
+	#`reboot`;
 }
