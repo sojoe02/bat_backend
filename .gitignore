@@ -1,1 +1,8 @@
+# Directories:
+adc/bin/
+adc/build/
+adc/documentation/
+
+# FileTypes:
 *.swp
+*.swo

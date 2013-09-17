@@ -1,0 +1,2 @@
+#define kast_vis_VERSION_MAJOR @bat_recorder_VERSION_MAJOR@
+#define kast_vis_VERSION_MINOR @bat_recorder_VERSION_MINOR@
