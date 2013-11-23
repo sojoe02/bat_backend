@@ -1,5 +1,7 @@
 #include<sys/types.h>
 #include<sys/mman.h>
+#include<sys/stat.h>
+
 #include<err.h>
 #include<fcntl.h>
 #include<stdio.h>
@@ -7,13 +9,19 @@
 #include<string.h>
 #include<unistd.h>
 #include<cstdint>
-
-
-//C11 includes.
+#include<fstream>
+#include<iostream>
 
 #include "recorder.h"
 #include "c_buffer.hpp"
 #include "../build/bat.h"
+
+
+//std::string _filename("cmd_pipe");
+std::ifstream _fifo;
+char _buffer[1024];
+int _file_descriptor;
+
 
 int init_Buffer();
 int cmd_Interpreter();
@@ -21,76 +29,55 @@ int cleanup();
 
 int main(int argc, char *argv[]){
 
-	printf("size of usigned long %i\n",sizeof(1UL));
+	FILE *fp;
+	char readbuf[1024];
+	char _filename[] = "pipe.txt";
 
-	//Sample sample1;
-	//sample1._sample_number = 50;
-	//sample1._sample_value = 219;
+	std::string cmd_exit = "exit";
+	std::string input;
 
+	umask(0);
+	mknod(_filename,S_IFIFO|0666,0);
+
+	while(cmd_exit.compare(input)){
+		fp = fopen(_filename,"r");
+		fgets(readbuf,1024,fp);
+		input = readbuf;
+		input = input.substr(0,input.length()-1);
+		//printf("Recieved string: %s\n",readbuf);
+		fclose(fp);
+		printf("pipe line: %s\n", input.c_str());
+	}
+			printf("exit pushed\n");
+
+	return 0;
+
+
+	//while(std::getline(_fifo,cmd)){				
+
+	//	read(_file_descriptor, _buffer, 1024);
+	//	cmd = _buffer;
+	//	printf("Received: %s\n", _buffer);		
+
+	//}
+
+	//unlink(_fifo);
 	//printf("size of sample %i, sizeof\n", sizeof(sample1));
-		
-	C_Buffer<uint32_t> buffer(200e6);
-	
-	
-	printf("this is seomething else, my PID is %i\n",getpid());
+	/* 	
+		C_Buffer<uint32_t> buffer(200e6);
+
+
+		printf("this is seomething else, my PID is %i\n",getpid());
 
 	//int sample[] = {5,4,3,2};
-	 uint8_t something = 3;
+	uint8_t something = 3;
 
-	 printf("testing values %d, %d \n", sizeof(something), something);
+	printf("testing values %d, %d \n", sizeof(something), something);
 
 	for(int i = 0; i<1e9; i++){
-		//printf("%d\t", i);
-		buffer.write_Samples(i);
-	}
-
-	//buffer.print_Buffer();
-	//
-
-	//sleep(3);
-	/*  	
-			sleep(30);
-	//Mapping of the ringbuffer:
-	//Open dev/zero to write zeros to the ringbuffer.
-	int fd = -1;
-	if((fd=open("/dev/zero", O_RDWR,0)) == -1){
-	err(1,"open");
-	}else printf("/dev/zero opened for reading and writing\n");
-
-	//allocate the memory for the snapshot and databuffer:
-	char *snapshot, *databuffer;
-	snapshot = (char*)mmap(NULL, 30e6, PROT_READ|PROT_WRITE,MAP_ANON|MAP_SHARED, -1,0);
-	databuffer = (char*)mmap(NULL, 128e6, PROT_READ|PROT_WRITE,MAP_SHARED, fd,0);
-
-	if(snapshot == MAP_FAILED || databuffer == MAP_FAILED){
-	errx(1,"either mmap");
-	}else printf("snapshot and databuffer initialized\n");
-
-	printf("contents of the databuffer are: %s \n", databuffer);
-
-	const char test[] = "something else";
-	const char test2[] = "something";
-
-
-
-	int i = 0;
-	while(i < 1e6){
-
-	strcat(databuffer, test);
-	i++;
-	}
-
-	strcat(databuffer, test2);
-
-
-
-	printf("contents of the databuffer are: %s \n", databuffer);
-
-	unsigned long t2 = 2UL << 12;
-
-
-	printf(" result is: %ul, bitshifted\n", t2);
-	*/
+	//printf("%d\t", i);
+	buffer.write_Samples(i);
+	} */
 
 }
 
@@ -99,11 +86,11 @@ int init_Buffer(){
 }
 
 
-void cmd_Interpreter(){
+int cmd_Interpreter(){
 	//create named pipe.
 }
 
-void cleanup(){
+int cleanup(){
 
 }
 
