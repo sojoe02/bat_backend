@@ -15,10 +15,10 @@ configure_file (
 #General files:
 set (GENERAL	
 	src/control.cpp
-	src/listener.h
-	src/listener.cpp
-	src/recorder.h
-	src/recorder.cpp
+	#src/recorder.h
+	#src/recorder.cpp
+	src/c_buffer.hpp
+	#src/c_buffer.cpp
 )
 
 #------------------------------------------------
@@ -27,12 +27,9 @@ set (GENERAL
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 add_executable(kast_vis ${GENERAL})
 #------------------------------------------------
-#Handle LUA implementation:
-#------------------------------------------------
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR})
 
 #target_link_libraries(kast_vis fltk -lXext  -ldl -lpthread -lpng -lfltk_images)
-
 #------------------------------------------------
 #Set compiler flags
 #------------------------------------------------
