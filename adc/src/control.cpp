@@ -27,6 +27,12 @@ int init_Buffer();
 int cmd_Interpreter();
 int cleanup();
 
+struct sample{
+	short int x;
+	short int y;
+	//short int f;
+};
+
 int main(int argc, char *argv[]){
 
 	FILE *fp;
@@ -39,7 +45,7 @@ int main(int argc, char *argv[]){
 	umask(0);
 	mknod(_filename,S_IFIFO|0666,0);
 
-	while(cmd_exit.compare(input)){
+	/*  while(cmd_exit.compare(input)){
 		fp = fopen(_filename,"r");
 		fgets(readbuf,1024,fp);
 		input = readbuf;
@@ -51,7 +57,7 @@ int main(int argc, char *argv[]){
 			printf("exit pushed\n");
 
 	return 0;
-
+*/
 
 	//while(std::getline(_fifo,cmd)){				
 
@@ -63,10 +69,10 @@ int main(int argc, char *argv[]){
 
 	//unlink(_fifo);
 	//printf("size of sample %i, sizeof\n", sizeof(sample1));
-	/* 	
-		C_Buffer<uint32_t> buffer(200e6);
+	 	
+		C_Buffer<sample> buffer(9000);
 
-
+ 
 		printf("this is seomething else, my PID is %i\n",getpid());
 
 	//int sample[] = {5,4,3,2};
@@ -74,10 +80,21 @@ int main(int argc, char *argv[]){
 
 	printf("testing values %d, %d \n", sizeof(something), something);
 
-	for(int i = 0; i<1e9; i++){
+	for(int i = 0; i<1e3; i++){
 	//printf("%d\t", i);
-	buffer.write_Samples(i);
-	} */
+		sample sample;
+		sample.x = i;
+		sample.y = i;
+		//sample.f = i;
+		buffer.write_Samples(sample);
+	} 
+	//buffer.print_Buffer();
+	//
+	sample* test_sample = buffer.get_Sample(23312);
+	printf("testing sample %i,%i\n",test_sample->x, test_sample->y);
+	
+	sample* test_sample2 = ++test_sample;
+	printf("testing sample %i,%i\n",(++test_sample2)->x, (++test_sample2)->y);
 
 }
 

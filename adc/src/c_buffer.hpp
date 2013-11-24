@@ -44,6 +44,7 @@ class C_Buffer{
 			printf("byte_size %i\n, that will be allocated", _byte_size);
 
 			printf("total amount of samples available %f\n", (double)_byte_size/(double)sizeof(Type));
+			_sample_amount = _byte_size/sizeof(Type);
 
 			_status = ftruncate(file_descriptor, _byte_size);
 			if(_status)
@@ -98,13 +99,26 @@ class C_Buffer{
 
 		void print_Buffer(){
 
-			for(int i = 0; i<_byte_size/sizeof(Type); i++){
-				printf("sample %d, %d \n", i,(Type)_address[i]);
-			}
+			//for(int i = 0; i<_byte_size/sizeof(Type); i++){
+				//printf("sample %d, %d \n", i,(Type)_address[i]);
+			//}
 
 		}
 
-		
+		Type* get_Sample(unsigned long long sample_number){
+			//calculate index:
+			unsigned long long index = sample_number;
+			if(sample_number > _sample_amount){				
+
+				index = sample_number % _sample_amount;
+				
+				printf("index is : %i, %i\n",index);
+			}
+
+			return (_address + index);
+		}
+
+
 
 	private:
 		int _byte_size; //number of bytes the buffer fills in virtual memory:
@@ -116,6 +130,7 @@ class C_Buffer{
 
 		int _status; //debug variable.
 		int _sample_size; //byte size of each sample.
+		unsigned long long _sample_amount;
 
 };
 #endif // C_BUFFER_HPP
