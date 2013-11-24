@@ -16,7 +16,7 @@
 #include "c_buffer.hpp"
 #include "../build/bat.h"
 
-
+#define BUFFER_SIZE 16556
 //std::string _filename("cmd_pipe");
 std::ifstream _fifo;
 char _buffer[1024];
@@ -27,11 +27,14 @@ int init_Buffer();
 int cmd_Interpreter();
 int cleanup();
 
-struct sample{
+struct Sample{
 	short int x;
 	short int y;
 	//short int f;
 };
+
+
+C_Buffer<Sample> buffer(BUFFER_SIZE);
 
 int main(int argc, char *argv[]){
 
@@ -70,7 +73,6 @@ int main(int argc, char *argv[]){
 	//unlink(_fifo);
 	//printf("size of sample %i, sizeof\n", sizeof(sample1));
 	 	
-		C_Buffer<sample> buffer(9000);
 
  
 		printf("this is seomething else, my PID is %i\n",getpid());
@@ -82,7 +84,7 @@ int main(int argc, char *argv[]){
 
 	for(int i = 0; i<1e3; i++){
 	//printf("%d\t", i);
-		sample sample;
+		Sample sample;
 		sample.x = i;
 		sample.y = i;
 		//sample.f = i;
@@ -90,24 +92,43 @@ int main(int argc, char *argv[]){
 	} 
 	//buffer.print_Buffer();
 	//
-	sample* test_sample = buffer.get_Sample(23312);
+	Sample* test_sample = buffer.get_Sample(34);
 	printf("testing sample %i,%i\n",test_sample->x, test_sample->y);
 	
-	sample* test_sample2 = ++test_sample;
+	Sample* test_sample2 = ++test_sample;
 	printf("testing sample %i,%i\n",(++test_sample2)->x, (++test_sample2)->y);
 
 }
-
-int init_Buffer(){
-
-}
-
 
 int cmd_Interpreter(){
 	//create named pipe.
 }
 
 int cleanup(){
+
+}
+
+int snapshot(int arg_byte_size, int arg_sample_number){
+	//Get rid of ekstra bytes:
+	int byte_size = arg_byte_size/sizeof(Sample) * sizeof(Sample); 
+
+	int fd = -1;
+	if((fd = open("/dev/zero", O_RDWR,0)) == -1 )
+		err(1,"open");
+
+	Sample *snapshot_space;
+	Sample *buffer_ptr;
+
+	buffer_ptr = buffer.get_Sample(arg_sample_number);
+
+	snapshot_space = (Sample*)mmap(NULL,byte_size, 
+			PROT_READ | PROT_WRITE, MAP_FILE|MAP_SHARED, fd, 0);
+
+	if(snapshot_space == MAP_FAILED)
+		errx(1,"snapshot allocation failed");
+
+	memcpy(snapshot_space, buffer_ptr, byte_size);
+
 
 }
 

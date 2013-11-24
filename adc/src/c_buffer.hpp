@@ -105,12 +105,12 @@ class C_Buffer{
 
 		}
 
-		Type* get_Sample(unsigned long long sample_number){
+		Type* get_Sample(unsigned long long arg_sample_number){
 			//calculate index:
-			unsigned long long index = sample_number;
-			if(sample_number > _sample_amount){				
+			unsigned long long index = arg_sample_number;
+			if(arg_sample_number > _sample_amount){				
 
-				index = sample_number % _sample_amount;
+				index = arg_sample_number % _sample_amount;
 				
 				printf("index is : %i, %i\n",index);
 			}
