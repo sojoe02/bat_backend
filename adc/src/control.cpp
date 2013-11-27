@@ -82,13 +82,16 @@ int main(int argc, char *argv[]){
 
 	printf("testing values %d, %d \n", sizeof(something), something);
 
-	for(int i = 0; i<1e3; i++){
+	for(uint64_t i = 0; i<1e9; i++){
 	//printf("%d\t", i);
 		Sample sample;
 		sample.x = i;
 		sample.y = i;
 		//sample.f = i;
 		buffer.write_Samples(sample);
+		if(i %(int)1e6 == 0){
+			printf("sample: %llu\n",i);
+		}
 	} 
 	//buffer.print_Buffer();
 	//

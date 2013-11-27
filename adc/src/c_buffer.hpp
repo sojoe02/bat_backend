@@ -16,7 +16,7 @@ class C_Buffer{
 
 	public:
 
-		C_Buffer(unsigned long long arg_byte_size)
+		C_Buffer(unsigned int arg_byte_size)
 		:_write_offset(0),_read_offset(0)
 		{
 			//path = "dev/zero";
@@ -105,9 +105,9 @@ class C_Buffer{
 
 		}
 
-		Type* get_Sample(unsigned long long arg_sample_number){
+		Type* get_Sample(unsigned int arg_sample_number){
 			//calculate index:
-			unsigned long long index = arg_sample_number;
+			unsigned int index = arg_sample_number;
 			if(arg_sample_number > _sample_amount){				
 
 				index = arg_sample_number % _sample_amount;
@@ -121,16 +121,16 @@ class C_Buffer{
 
 
 	private:
-		int _byte_size; //number of bytes the buffer fills in virtual memory:
-		unsigned long long _read_offset; //
-		int _write_offset; //
+		unsigned int _byte_size; //number of bytes the buffer fills in virtual memory:
+		unsigned int _read_offset; //
+		unsigned int _write_offset; //
 		//unsigned long _count_bytes;
 		Type* _address; //
 		std::string  _path;
 
-		int _status; //debug variable.
-		int _sample_size; //byte size of each sample.
-		unsigned long long _sample_amount;
+		unsigned int _status; //debug variable.
+		unsigned int _sample_size; //byte size of each sample.
+		unsigned int _sample_amount;
 
 };
 #endif // C_BUFFER_HPP
