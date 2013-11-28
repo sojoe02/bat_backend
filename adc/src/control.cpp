@@ -12,7 +12,7 @@
 #include<fstream>
 #include<iostream>
 
-#include "recorder.h"
+#include "recorder.hpp"
 #include "c_buffer.hpp"
 #include "../build/bat.h"
 
@@ -34,7 +34,7 @@ struct Sample{
 };
 
 
-C_Buffer<Sample> buffer(BUFFER_SIZE);
+C_Buffer<Sample> buffer(16e6);
 
 int main(int argc, char *argv[]){
 
@@ -82,15 +82,15 @@ int main(int argc, char *argv[]){
 
 	printf("testing values %d, %d \n", sizeof(something), something);
 
-	for(uint64_t i = 0; i<1e9; i++){
+	for(int i = 0; i<1e9; i++){
 	//printf("%d\t", i);
 		Sample sample;
 		sample.x = i;
 		sample.y = i;
 		//sample.f = i;
 		buffer.write_Samples(sample);
-		if(i %(int)1e6 == 0){
-			printf("sample: %llu\n",i);
+		if(i % (int)1e7 == 0){
+			printf("sample: %i\n",i);
 		}
 	} 
 	//buffer.print_Buffer();

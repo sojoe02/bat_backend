@@ -1,15 +1,8 @@
-#include<stdio.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <comedilib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
 
-#include"recorder.h"
-
-Recorder::Recorder()
-	:value(50)
-{
-
-}
-
-
-void Recorder::printValue(){
-	printf("Value is %i\n",value);
-}
 

@@ -16,7 +16,7 @@ configure_file (
 set (GENERAL	
 	src/control.cpp
 	#src/recorder.h
-	#src/recorder.cpp
+	src/recorder.hpp
 	src/c_buffer.hpp
 	#src/c_buffer.cpp
 )
@@ -25,13 +25,14 @@ set (GENERAL
 #Set subdirectories:
 #------------------------------------------------
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
-add_executable(kast_vis ${GENERAL})
+add_executable(adc_grapper ${GENERAL})
 #------------------------------------------------
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR})
 
-#target_link_libraries(kast_vis fltk -lXext  -ldl -lpthread -lpng -lfltk_images)
+target_link_libraries(adc_grapper -lcomedi -lm)
 #------------------------------------------------
 #Set compiler flags
 #------------------------------------------------
 
-set(CMAKE_CXX_FLAGS "-std=c++0x -g")
+set(CMAKE_CXX_FLAGS "-std=c++0x -O3")
+
