@@ -39,8 +39,8 @@ class C_Buffer{
 
 			//calculate byte_size, must be a multiple of 4096 and divisable by sample_size;
 			printf("Wished for byte_size, %i\n", arg_byte_size);
-			_byte_size = arg_byte_size/4096 * 4096;
-			_byte_size = _byte_size/sizeof(Type) * sizeof(Type);
+			_byte_size = (arg_byte_size/4096) * 4096;
+			//_byte_size = _byte_size/sizeof(Type) * sizeof(Type);
 			printf("byte_size %i\n, that will be allocated", _byte_size);
 
 			printf("total amount of samples available %f\n", (double)_byte_size/(double)sizeof(Type));

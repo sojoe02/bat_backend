@@ -34,7 +34,7 @@ struct Sample{
 };
 
 
-C_Buffer<Sample> buffer(16e6);
+C_Buffer<Sample> buffer(190e6);
 
 int main(int argc, char *argv[]){
 
@@ -93,17 +93,18 @@ int main(int argc, char *argv[]){
 	}
 
 	
-	Recorder<Sample> recorder;
+	Recorder recorder;
+
 	
 	char device[] = "/dev/comedi0";
-	//recorder.start_Sampling(device, 1e6, buffer.get_Start_Address(), 
-	//		buffer.get_End_Address(), buffer.get_Buffer_Size());
+	recorder.start_Sampling(device, 1e6, buffer.get_Start_Address(), 
+			buffer.get_End_Address(), buffer.get_Buffer_Size());
 
 	//buffer.print_Buffer();
 	//
 	Sample* test_sample = buffer.get_Sample(34);
 	printf("testing sample %i,%i\n",test_sample->x, test_sample->y);
-	
+
 	Sample* test_sample2 = ++test_sample;
 	printf("testing sample %i,%i\n",(++test_sample2)->x, (++test_sample2)->y);
 

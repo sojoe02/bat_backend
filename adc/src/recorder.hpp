@@ -13,19 +13,18 @@
 
 #include <atomic>
 
-template <class Type>
-
 class Recorder{
 
 	public:
 
 		Recorder():
 			_sample_rate(0), _channel_amount(0),_stop(false){
+				
 			}
 
 
 		int start_Sampling(char* arg_device, float arg_sample_rate, 
-				Type* arg_start_address, Type* arg_end_address, int arg_buffer_size){
+				char* arg_start_address, char* arg_end_address, int arg_buffer_size){
 
 			_channel_amount = 16;
 
@@ -35,6 +34,18 @@ class Recorder{
 
 			comedi_cmd *cmd = (comedi_cmd *) calloc(1, sizeof(comedi_cmd));
 			_device = comedi_open(arg_device);
+
+
+			int buffer = 1048576*100;
+			if(comedi_set_max_buffer_size(_device, 0, buffer) < 0 ){
+				printf("Failed to set max buffer size to %ikB\n", buffer);
+				return -1;
+			} else printf("Maximum buffer size set to %iB\n", comedi_get_max_buffer_size(_device,0));
+
+			if(comedi_set_buffer_size(_device, 0, buffer) < 0){
+				printf("Failed to set buffer size to %iBytes\n", buffer);
+				return -1;
+			} else printf("Buffer size set to %iBytes\n", comedi_get_buffer_size(_device,0));
 
 			if(!_device){
 				errx(1, "unable to open device");
@@ -68,20 +79,25 @@ class Recorder{
 
 			}
 
-			unsigned int index;
 			FILE* dux_fp;
 
-			if((dux_fp = fdopen(comedi_fileno(_device), "r"))<= 0)
+
+			if((dux_fp = fdopen(comedi_fileno(_device), "r")) <= 0)
 				comedi_perror("fdopen");
+					
+//			if((fp = open(_device), O_RDONLY, S_IREAD))<=0)
+//				comedi_perror("open");
 
-			Type* write_address = arg_start_address;
+			char* write_address = arg_start_address;
 
-			while((ret = fread(arg_start_address, 1, 4096,dux_fp)) >= 0){
-				
-				write_address++;
+			while((ret = fread(write_address, 1, 4096,dux_fp)) >= 0){
+			//while((ret = read(comedi_fileno(_device), write_address, 8192*2)) >= 0){
+				write_address+=4096;
 
-				if(write_address > arg_end_address)
-					write_address = arg_start_address;
+				if(write_address == arg_end_address){
+					write_address -= arg_buffer_size;
+					printf("resetting to beginning of buffer\n");
+				}
 
 				if(_stop)
 					break;				
