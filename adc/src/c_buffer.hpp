@@ -50,27 +50,27 @@ class C_Buffer{
 			if(_status)
 				errx(1, "error on truncation of file descriptor, to fit page size");
 
-			address = (char*)mmap(NULL, _byte_size << 1, PROT_NONE, 
+			_address = (char*)mmap(NULL, _byte_size << 1, PROT_NONE, 
 					MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
-			if(address == MAP_FAILED){
+			if(_address == MAP_FAILED){
 				errx(1,"failed to map buffer currectly");
 			}
 
-			address = (char*)mmap(address, _byte_size, PROT_READ | PROT_WRITE, 
+			address = (char*)mmap(_address, _byte_size, PROT_READ | PROT_WRITE, 
 					MAP_FIXED |	MAP_SHARED, file_descriptor, 0);
 
-			_start_address = (Type*)address;
-			_end_address = (Type*)address + _byte_size;
+			_start_address = _address;
+			_end_address = _address + _byte_size;
 
 			if(address == MAP_FAILED){
 				errx(1,"failed to map secondary buffer correctly");
 			}
 
-			address = (char*)mmap(address + _byte_size, _byte_size, 
+			address = (char*)mmap(_address + _byte_size, _byte_size, 
 					PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, file_descriptor,0);
 
-			if(_address != (Type*)(address + _byte_size))
+			if(address != _address + _byte_size)
 				errx(1, "ring buffer does not eat it's own tail");
 
 			_status = close(file_descriptor);
@@ -92,12 +92,12 @@ class C_Buffer{
 		void write_Samples(Type arg_sample){
 			//memcpy(_address ,arg_samples, arg_num_bytes);
 
-			if(_write_offset == _byte_size/sizeof(Type))
+			//if(_write_offset == _byte_size/sizeof(Type))
 				_write_offset = 0;
 
-			*(_address + _write_offset) = arg_sample;
+			//*(_address + _write_offset) = arg_sample;
 			//printf("%d\n",(int)*(_address + _write_offset));
-			_write_offset++;
+			//_write_offset++;
 		}
 
 		void print_Buffer(){
@@ -118,14 +118,14 @@ class C_Buffer{
 				printf("index is : %i, %i\n",index);
 			}
 
-			return (_address + index);
+			return ((Type*)_address + index);
 		}
 
-		Type* get_Start_Address(){
+		char* get_Start_Address(){
 			return _start_address;			
 		}
 
-		Type* get_End_Address(){
+		char* get_End_Address(){
 			return _end_address;
 		}
 
@@ -140,9 +140,9 @@ class C_Buffer{
 		unsigned int _read_offset; //
 		unsigned int _write_offset; //
 		//unsigned long _count_bytes;
-		Type* _address; //
-		Type* _start_address; //
-		Type* _end_address;
+		char* _address; //
+		char* _start_address; //
+		char* _end_address;
 
 		std::string  _path;
 
