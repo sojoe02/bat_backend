@@ -82,17 +82,25 @@ int main(int argc, char *argv[]){
 
 	printf("testing values %d, %d \n", sizeof(something), something);
 
-	for(int i = 0; i<1e9; i++){
+	for(int i = 0; i<1e6; i++){
 	//printf("%d\t", i);
 		Sample sample;
 		sample.x = i;
 		sample.y = i;
 		//sample.f = i;
 		buffer.write_Samples(sample);
-		if(i % (int)1e7 == 0){
-			printf("sample: %i\n",i);
-		}
-	} 
+		//if(i % (int)1e7 == 0){
+		//	printf("sample: %i\n",i);
+		//}
+	}
+
+	
+	Recorder<Sample> recorder;
+	
+	char device[] = "/dev/comedi0";
+	recorder.start_Sampling(device, 1e6, buffer.get_Start_Address(), 
+			buffer.get_End_Address(), buffer.get_Buffer_Size());
+
 	//buffer.print_Buffer();
 	//
 	Sample* test_sample = buffer.get_Sample(34);

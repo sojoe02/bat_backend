@@ -24,7 +24,7 @@ class C_Buffer{
 
 
 			char path[] = "/dev/shm/data_buffer-XXXXXX";
-			Type* address;
+			char* address;
 
 			file_descriptor = mkstemp(path);
 			
@@ -50,24 +50,27 @@ class C_Buffer{
 			if(_status)
 				errx(1, "error on truncation of file descriptor, to fit page size");
 
-			_address = (Type*)mmap(NULL, _byte_size << 1, PROT_NONE, 
+			address = (char*)mmap(NULL, _byte_size << 1, PROT_NONE, 
 					MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
-			if(_address == MAP_FAILED){
+			if(address == MAP_FAILED){
 				errx(1,"failed to map buffer currectly");
 			}
 
-			address = (Type*)mmap(_address, _byte_size, PROT_READ | PROT_WRITE, 
+			address = (char*)mmap(address, _byte_size, PROT_READ | PROT_WRITE, 
 					MAP_FIXED |	MAP_SHARED, file_descriptor, 0);
+
+			_start_address = (Type*)address;
+			_end_address = (Type*)address + _byte_size;
 
 			if(address == MAP_FAILED){
 				errx(1,"failed to map secondary buffer correctly");
 			}
 
-			address = (Type*)mmap(_address + _byte_size, _byte_size, 
+			address = (char*)mmap(address + _byte_size, _byte_size, 
 					PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, file_descriptor,0);
 
-			if(address != _address + _byte_size)
+			if(_address != (Type*)(address + _byte_size))
 				errx(1, "ring buffer does not eat it's own tail");
 
 			_status = close(file_descriptor);
@@ -118,6 +121,18 @@ class C_Buffer{
 			return (_address + index);
 		}
 
+		Type* get_Start_Address(){
+			return _start_address;			
+		}
+
+		Type* get_End_Address(){
+			return _end_address;
+		}
+
+		unsigned int get_Buffer_Size(){
+			return _byte_size;
+		}
+
 
 
 	private:
@@ -126,6 +141,9 @@ class C_Buffer{
 		unsigned int _write_offset; //
 		//unsigned long _count_bytes;
 		Type* _address; //
+		Type* _start_address; //
+		Type* _end_address;
+
 		std::string  _path;
 
 		unsigned int _status; //debug variable.
