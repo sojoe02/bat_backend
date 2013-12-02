@@ -5,7 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <comedilib.h>
+#include <comedilib.hpp>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -36,7 +36,7 @@ class Recorder{
 			_device = comedi_open(arg_device);
 
 
-			int buffer = 1048576*100;
+			int buffer = 1048576;
 			if(comedi_set_max_buffer_size(_device, 0, buffer) < 0 ){
 				printf("Failed to set max buffer size to %ikB\n", buffer);
 				return -1;
@@ -84,23 +84,34 @@ class Recorder{
 
 			if((dux_fp = fdopen(comedi_fileno(_device), "r")) <= 0)
 				comedi_perror("fdopen");
+
+			//char fbuffer[4096];
+
+			//setbuf(dux_fp,fbuffer);
 					
 //			if((fp = open(_device), O_RDONLY, S_IREAD))<=0)
 //				comedi_perror("open");
 
 			char* write_address = arg_start_address;
 
+			int round = 0;
+
 			while((ret = fread(write_address, 1, 4096,dux_fp)) >= 0){
-			//while((ret = read(comedi_fileno(_device), write_address, 8192*2)) >= 0){
+			//while(1){
+				//ret = read(comedi_fileno(_device), write_address, 4096);
 				write_address+=4096;
 
+
+
 				if(write_address == arg_end_address){
+					round++;
 					write_address -= arg_buffer_size;
 					printf("resetting to beginning of buffer\n");
 				}
 
-				if(_stop)
-					break;				
+				if(_stop || round >= 5)
+					break;
+		
 			}
 
 
@@ -117,7 +128,7 @@ class Recorder{
 		}
 
 
-	private:
+			private:
 
 		std::atomic_bool _stop;
 
@@ -125,5 +136,5 @@ class Recorder{
 		int _channel_amount;
 		FILE* _dux_fp;
 		comedi_t* _device;
-};
+		};
 #endif // RECORDER_HPP

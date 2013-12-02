@@ -97,7 +97,7 @@ int main(int argc, char *argv[]){
 
 	
 	char device[] = "/dev/comedi0";
-	recorder.start_Sampling(device, 1e6, buffer.get_Start_Address(), 
+	recorder.start_Sampling(device, 30e5, buffer.get_Start_Address(), 
 			buffer.get_End_Address(), buffer.get_Buffer_Size());
 
 	//buffer.print_Buffer();
