@@ -21,9 +21,10 @@
 #include "../build/bat.h"
 
 float _sample_rate = 30e5;
+int _snapshot_size = (int)10e6;
 
 void stop_recording();
-int snapshot(int arg_byte_size, int arg_sample_number);
+void snapshot(int arg_byte_size, int arg_sample_number);
 void start_recording(char arg_device[], float arg_sample_rate, 
 		char* arg_start_address, char* arg_end_address, int arg_buffer_size);
 
@@ -53,12 +54,14 @@ int main(int argc, char *argv[]){
 	std::string cmd_exit = "exit";
 	std::string cmd_start_rec = "start_rec";
 	std::string cmd_stop_rec = "stop_rec";
+	std::string cmd_take_snapshot = "take_snapshot";
 	std::string input;
 
 	printf("CMDs available are \n");
 	printf("'exit'\texits the grapper\n");
 	printf("'start_rec'\tstarts the recorder module\n");
 	printf("'stop_rec'\tstops the recorder module\n");
+
 
 	umask(0);
 	mknod(filename, S_IFIFO | 0666, 0);
@@ -92,27 +95,39 @@ int main(int argc, char *argv[]){
 				printf("Stopping recording now\n");
 				stop_recording();			
 			}
-
-		}else
+		
+		}else if(cmd_take_snapshot.compare(input)){
+			printf("waiting for sample number -1 to ignore\n");
+			f_pipe = fopen(filename, "r");
+			fgets(f_buffer,4096, f_pipe);
+			input = f_buffer;
+			input = input.substr(0,input.length()-1);
+			int sample_number = atoi(input.c_str());
+			if(sample_number >= 1){
+				std::thread s_thread(snapshot,_snapshot_size,sample_number);
+			}else printf("cancelling snapshot, sample number: %i\n", sample_number);
+		}		
+		else
 			printf("Command '%s' unknown\n", input.c_str());
 	}
 
 }
 
-int snapshot(int arg_byte_size, int arg_sample_number){
+void snapshot(int arg_byte_size, int arg_sample_number){
 	//get rid of ekstra bytes:
+	//and ensure that one whole samples are saved:
 	int byte_size = arg_byte_size/sizeof(Sample) * sizeof(Sample); 
 
 	int fd = -1;
 	if((fd = open("/dev/zero", O_RDWR,0)) == -1 )
 		err(1,"open");
 
-	Sample *snapshot_space;
-	Sample *buffer_ptr;
+	char *snapshot_space;
+	char *buffer_ptr;
 
 	buffer_ptr = _c_buffer.get_Sample(arg_sample_number);
 
-	snapshot_space = (Sample*)mmap(NULL,byte_size, 
+	snapshot_space = (char*)mmap(NULL,byte_size, 
 			PROT_READ | PROT_WRITE, MAP_FILE|MAP_SHARED, fd, 0);
 
 	if(snapshot_space == MAP_FAILED)
@@ -120,6 +135,16 @@ int snapshot(int arg_byte_size, int arg_sample_number){
 
 	memcpy(snapshot_space, buffer_ptr, byte_size);
 
+	//save mmap to disk:
+	FILE *s_file;
+	char name_buf[1024];
+	sprintf(name_buf,"snapshot,%i",arg_sample_number);
+	s_file = fopen(name_buf, "wb");
+	fwrite (snapshot_space, sizeof(char), byte_size, s_file);	
+	fclose(s_file);
+	//clear mmap:
+	munmap(snapshot_space,byte_size);
+	close(fd);
 
 }
 

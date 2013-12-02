@@ -108,7 +108,9 @@ class C_Buffer{
 
 		}
 
-		Type* get_Sample(unsigned int arg_sample_number){
+
+
+		char* get_Sample(unsigned int arg_sample_number){
 			//calculate index:
 			unsigned int index = arg_sample_number;
 			if(arg_sample_number > _sample_amount){				
@@ -118,7 +120,7 @@ class C_Buffer{
 				printf("index is : %i, %i\n",index);
 			}
 
-			return ((Type*)_address + index);
+			return _address + (index * sizeof(Type));
 		}
 
 		char* get_Start_Address(){
