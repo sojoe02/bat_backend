@@ -76,50 +76,38 @@ class Recorder{
 
 				fprintf(stderr, "err: %d\n", ret);
 				return -1;
-
 			}
 
 			FILE* dux_fp;
-
 
 			if((dux_fp = fdopen(comedi_fileno(_device), "r")) <= 0)
 				comedi_perror("fdopen");
 
 			//char fbuffer[4096];
-
-			//setbuf(dux_fp,fbuffer);
-					
-//			if((fp = open(_device), O_RDONLY, S_IREAD))<=0)
-//				comedi_perror("open");
-
+			//setbuf(dux_fp,fbuffer);		
+			//if((fp = open(_device), O_RDONLY, S_IREAD))<=0)				
+			//comedi_perror("open");
 			char* write_address = arg_start_address;
-
-			int round = 0;
+			//int round = 0;
 
 			while((ret = fread(write_address, 1, 4096,dux_fp)) >= 0){
 			//while(1){
 				//ret = read(comedi_fileno(_device), write_address, 4096);
 				write_address+=4096;
 
-
-
 				if(write_address == arg_end_address){
-					round++;
+				//	round++;
 					write_address -= arg_buffer_size;
 					printf("resetting to beginning of buffer\n");
 				}
-
-				if(_stop || round >= 5)
-					break;
-		
+				//if(_stop || round >= 5)
+				//	break;		
 			}
-
 
 			if(ret < 0)
 				perror("read");
 
 			comedi_cancel(_device, 0);
-
 			return 0;
 		}
 

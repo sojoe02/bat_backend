@@ -34,5 +34,5 @@ target_link_libraries(adc_grapper -lcomedi -lm)
 #Set compiler flags
 #------------------------------------------------
 
-set(CMAKE_CXX_FLAGS "-std=c++0x -O3")
+set(CMAKE_CXX_FLAGS "-std=c++0x -O3 -pthread")
 

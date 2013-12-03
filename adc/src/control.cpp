@@ -46,11 +46,11 @@ Recorder _recorder;
 int main(int argc, char *argv[]){
 
 	//open the cmd pipe:
-	FILE *f_pipe;
-	char f_buffer[4096];
-	char filename[] = "/home/pi/crapper.cmd";
+	FILE* f_pipe;
+	char f_buffer[96];
+	char filename[] = "/home/pi/grapper.cmd";
 	char device[] = "/dev/comedi0";
-	
+
 	std::string cmd_exit = "exit";
 	std::string cmd_start_rec = "start_rec";
 	std::string cmd_stop_rec = "stop_rec";
@@ -62,21 +62,25 @@ int main(int argc, char *argv[]){
 	printf("'start_rec'\tstarts the recorder module\n");
 	printf("'stop_rec'\tstops the recorder module\n");
 
-
 	umask(0);
-	mknod(filename, S_IFIFO | 0666, 0);
 
-	//initiate the recorder
+	printf("Creating Pipe... Waiting for receiver process...\n\n");
+	//TRY TO CRATE A NAMED PIPE
+	if (mkfifo(filename,0666)<0){
+		perror("FIFO (named pipe) could not be created.");
+		//exit(-1);
+	}
 
-	while(cmd_exit.compare(input)){	
-
+	while(1){	
+		sleep(1);;
 		f_pipe = fopen(filename, "r");
-		fgets(f_buffer, 4096, f_pipe);
+		fgets(f_buffer, 96, f_pipe);
 		input = f_buffer;
 		//remove end of line:
 		input = input.substr(0,input.length()-1);
+		printf("input is %s\n", input.c_str());
 
-		if(cmd_start_rec.compare(input)){
+		if(cmd_start_rec.compare(input) == 0){
 			if(_recording){
 				printf("System is recording, you need to stop ('stop_rec') it to restart it\n");
 
@@ -86,31 +90,44 @@ int main(int argc, char *argv[]){
 				_record_thread = new std::thread(start_recording, device, 
 						_sample_rate, _c_buffer.get_Start_Address(),
 						_c_buffer.get_End_Address(), _c_buffer.get_Buffer_Size());
-
 			}
-		}else if(cmd_stop_rec.compare(input)){
+		}else if(cmd_stop_rec.compare(input) == 0){
 			if(!_recording){
 				printf("System is not recording, no need to stop it\n");			
 			}else{
 				printf("Stopping recording now\n");
 				stop_recording();			
-			}
-		
-		}else if(cmd_take_snapshot.compare(input)){
-			printf("waiting for sample number -1 to ignore\n");
-			f_pipe = fopen(filename, "r");
-			fgets(f_buffer,4096, f_pipe);
-			input = f_buffer;
-			input = input.substr(0,input.length()-1);
+			}		
+		}else if(cmd_take_snapshot.compare(input.substr(0,13)) == 0){
+			input = input.substr(14, input.length()-1);
 			int sample_number = atoi(input.c_str());
 			if(sample_number >= 1){
+				printf("taking snapshot, sample %i\n",sample_number);
 				std::thread s_thread(snapshot,_snapshot_size,sample_number);
+				s_thread.detach();
 			}else printf("cancelling snapshot, sample number: %i\n", sample_number);
-		}		
-		else
+		}else if(cmd_exit.compare(input) == 0){
+			if(_recording){
+				printf("stopping recording\n");
+				stop_recording();
+			}
+			break;
+		}else if(input.compare("say")){
+			printf("saying something, testing pipe\n");
+			
+		}else
 			printf("Command '%s' unknown\n", input.c_str());
+
+		fclose(f_pipe);
 	}
 
+	if (unlink(filename)<0){
+		perror("Error deleting pipe file.");
+		exit(-1);
+	}
+	fclose(f_pipe);
+
+	printf("exiting \n");
 }
 
 void snapshot(int arg_byte_size, int arg_sample_number){
@@ -146,6 +163,7 @@ void snapshot(int arg_byte_size, int arg_sample_number){
 	munmap(snapshot_space,byte_size);
 	close(fd);
 
+//	printf("snapshotting\n");
 }
 
 
