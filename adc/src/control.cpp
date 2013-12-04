@@ -67,7 +67,7 @@ int main(int argc, char *argv[]){
 	printf("Creating Pipe... Waiting for receiver process...\n\n");
 	//TRY TO CRATE A NAMED PIPE
 	if (mkfifo(filename,0666)<0){
-		perror("FIFO (named pipe) could not be created.");
+		perror("FIFO (named pipe) could not be created, it exists allready?");
 		//exit(-1);
 	}
 
@@ -91,14 +91,19 @@ int main(int argc, char *argv[]){
 						_sample_rate, _c_buffer.get_Start_Address(),
 						_c_buffer.get_End_Address(), _c_buffer.get_Buffer_Size());
 			}
-		}else if(cmd_stop_rec.compare(input) == 0){
+		}
+
+		else if(cmd_stop_rec.compare(input) == 0){
 			if(!_recording){
 				printf("System is not recording, no need to stop it\n");			
 			}else{
 				printf("Stopping recording now\n");
 				stop_recording();			
-			}		
-		}else if(cmd_take_snapshot.compare(input.substr(0,13)) == 0){
+			}
+
+		}
+
+		else if(cmd_take_snapshot.compare(input.substr(0,13)) == 0){
 			input = input.substr(14, input.length()-1);
 			int sample_number = atoi(input.c_str());
 			if(sample_number >= 1){
@@ -106,21 +111,20 @@ int main(int argc, char *argv[]){
 				std::thread s_thread(snapshot,_snapshot_size,sample_number);
 				s_thread.detach();
 			}else printf("cancelling snapshot, sample number: %i\n", sample_number);
-		}else if(cmd_exit.compare(input) == 0){
+		}
+
+		else if(cmd_exit.compare(input) == 0){
 			if(_recording){
 				printf("stopping recording\n");
 				stop_recording();
 			}
-			break;
-		}else if(input.compare("say")){
-			printf("saying something, testing pipe\n");
-			
+			break;			
+
 		}else
 			printf("Command '%s' unknown\n", input.c_str());
 
 		fclose(f_pipe);
 	}
-
 	if (unlink(filename)<0){
 		perror("Error deleting pipe file.");
 		exit(-1);
@@ -135,18 +139,10 @@ void snapshot(int arg_byte_size, int arg_sample_number){
 	//and ensure that one whole samples are saved:
 	int byte_size = arg_byte_size/sizeof(Sample) * sizeof(Sample); 
 
-	//int fd = -1;
-	//if((fd = open("/dev/zero", O_RDWR,0)) == -1 )
-	//	err(1,"open");
-
 	char *snapshot_space;
 	char *buffer_ptr;
 
 	buffer_ptr = _c_buffer.get_Sample(arg_sample_number);
-
-	Sample* sample = (Sample*)_c_buffer.get_Sample(arg_sample_number);
-	printf("%i\n", sample->sample[0]);
-
 
 	snapshot_space = (char*)mmap(NULL,byte_size, 
 			PROT_READ | PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);
@@ -165,9 +161,6 @@ void snapshot(int arg_byte_size, int arg_sample_number){
 	fclose(s_file);
 	//clear mmap:
 	munmap(snapshot_space,byte_size);
-	//close(fd);
-
-//	printf("snapshotting\n");
 }
 
 

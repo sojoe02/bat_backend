@@ -1,4 +1,25 @@
 
+/*
+ * =====================================================================================
+ *
+ *       Filename:  control.cpp
+ *
+ *    Description:  This is the comedi interface, that initializes the USBDUX-FAST unit
+ *				it is designed to run on a seperate thread, sampling can be stoppen via
+ *				an atomic boolean, allways stop sampling when restarting!
+ *
+ *        Created:  2013-11
+ *       Revision:  none
+ *       Compiler:  gcc (g++ C11 comptible)
+ *
+ *         Author:  Soeren V. Joergensen, svjo@mmmi.sdu.dk
+ *   Organization:  MMMI, University of Sourthern Denmark
+ *
+ * =====================================================================================
+ */
+
+
+
 #ifndef RECORDER_HPP
 #define RECORDER_HPP
 
@@ -83,25 +104,15 @@ class Recorder{
 			if((dux_fp = fdopen(comedi_fileno(_device), "r")) <= 0)
 				comedi_perror("fdopen");
 
-			//char fbuffer[4096];
-			//setbuf(dux_fp,fbuffer);		
-			//if((fp = open(_device), O_RDONLY, S_IREAD))<=0)				
-			//comedi_perror("open");
 			char* write_address = arg_start_address;
-			//int round = 0;
 
 			while((ret = fread(write_address, 1, 4096,dux_fp)) >= 0){
-			//while(1){
-				//ret = read(comedi_fileno(_device), write_address, 4096);
 				write_address+=4096;
 
 				if(write_address == arg_end_address){
-				//	round++;
 					write_address -= arg_buffer_size;
 					printf("resetting to beginning of buffer\n");
 				}
-				//if(_stop || round >= 5)
-				//	break;		
 			}
 
 			if(ret < 0)

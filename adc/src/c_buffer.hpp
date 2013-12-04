@@ -1,4 +1,23 @@
 
+/*
+ * =====================================================================================
+ *
+ *   Filename:  c_buffer.hpp
+ *
+ *   Description:  this is the circular buffer, the type template dictates the data-type
+ *		of samples it is used for, it's very important that size of type is a multiple 
+ *		4096, which is the std. pagesize of a posix system.
+ *
+ *   Created:  2013-11
+ *   Revision:  none
+ *   Compiler:  gcc(C11)
+ *
+ *   Author:  Soeren V. Joergensen, svjo@mmmi.sdu.dk
+ *   Organization:  MMMI, University of Sourthern Denmark
+ *
+ * =====================================================================================
+*/
+
 #ifndef C_BUFFER_HPP
 #define C_BUFFER_HPP
 
@@ -87,27 +106,6 @@ class C_Buffer{
 			if(_status)
 				errx(1, "unable to delete memory mapping");
 		}
-
-
-		void write_Samples(Type arg_sample){
-			//memcpy(_address ,arg_samples, arg_num_bytes);
-
-			//if(_write_offset == _byte_size/sizeof(Type))
-				_write_offset = 0;
-
-			//*(_address + _write_offset) = arg_sample;
-			//printf("%d\n",(int)*(_address + _write_offset));
-			//_write_offset++;
-		}
-
-		void print_Buffer(){
-
-			//for(int i = 0; i<_byte_size/sizeof(Type); i++){
-				//printf("sample %d, %d \n", i,(Type)_address[i]);
-			//}
-
-		}
-
 
 
 		char* get_Sample(unsigned int arg_sample_number){
