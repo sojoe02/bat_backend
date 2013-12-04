@@ -5,8 +5,8 @@
  *   Filename:  c_buffer.hpp
  *
  *   Description:  this is the circular buffer, the type template dictates the data-type
- *		of samples it is used for, it's very important that size of type is a multiple 
- *		4096, which is the std. pagesize of a posix system.
+ *		of samples it is used for, it's very important that size of type 
+ *		is a multiple 4096, which is the std. pagesize of a posix system.
  *
  *   Created:  2013-11
  *   Revision:  none

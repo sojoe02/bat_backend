@@ -1,3 +1,29 @@
+
+/*
+ * =====================================================================================
+ *
+ *       Filename:  control.cpp
+ *
+ *    Description:  Control is the interface into the data grapper it uses POSIX
+ *			to control data recording, this piece of software is designed to run in a 
+ *			Raspberry Pi, it can sample an analog source at 3[Mhz] into a circular
+ * 			buffer located in a temporary file in /dev/shm.
+ *			Raw data snapshots can be taken via the snapshot command, these will be saved.
+ *			locally in a uid named file.
+ *			For 3[Mhz] sampling it's recommended to overclock the Pi to 900[Mhz]. 
+ *
+ *        Created:  2013-11
+ *       Revision:  none
+ *       Compiler:  gcc (g++ C11 comptible)
+ *
+ *         Author:  Soeren V. Joergensen, svjo@mmmi.sdu.dk
+ *   Organization:  MMMI, SDU dk
+ *
+ * =====================================================================================
+ */
+
+
+
 #include<sys/types.h>
 #include<sys/mman.h>
 #include<sys/stat.h>
