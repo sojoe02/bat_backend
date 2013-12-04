@@ -135,17 +135,21 @@ void snapshot(int arg_byte_size, int arg_sample_number){
 	//and ensure that one whole samples are saved:
 	int byte_size = arg_byte_size/sizeof(Sample) * sizeof(Sample); 
 
-	int fd = -1;
-	if((fd = open("/dev/zero", O_RDWR,0)) == -1 )
-		err(1,"open");
+	//int fd = -1;
+	//if((fd = open("/dev/zero", O_RDWR,0)) == -1 )
+	//	err(1,"open");
 
 	char *snapshot_space;
 	char *buffer_ptr;
 
 	buffer_ptr = _c_buffer.get_Sample(arg_sample_number);
 
+	Sample* sample = (Sample*)_c_buffer.get_Sample(arg_sample_number);
+	printf("%i\n", sample->sample[0]);
+
+
 	snapshot_space = (char*)mmap(NULL,byte_size, 
-			PROT_READ | PROT_WRITE, MAP_FILE|MAP_SHARED, fd, 0);
+			PROT_READ | PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);
 
 	if(snapshot_space == MAP_FAILED)
 		errx(1,"snapshot allocation failed");
@@ -161,7 +165,7 @@ void snapshot(int arg_byte_size, int arg_sample_number){
 	fclose(s_file);
 	//clear mmap:
 	munmap(snapshot_space,byte_size);
-	close(fd);
+	//close(fd);
 
 //	printf("snapshotting\n");
 }
