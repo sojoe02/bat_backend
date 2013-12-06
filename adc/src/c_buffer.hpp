@@ -35,12 +35,11 @@ class C_Buffer{
 
 	public:
 
-		C_Buffer(unsigned int arg_byte_size)
+		C_Buffer(uint32_t arg_byte_size)
 		:_write_offset(0),_read_offset(0)
 		{
 			//path = "dev/zero";
 			int file_descriptor;
-
 
 			char path[] = "/dev/shm/data_buffer-XXXXXX";
 			char* address;
@@ -63,7 +62,7 @@ class C_Buffer{
 			printf("byte_size %i\n, that will be allocated", _byte_size);
 
 			printf("total amount of samples available %f\n", (double)_byte_size/(double)sizeof(Type));
-			_sample_amount = _byte_size/sizeof(Type);
+			_sample_amount = uint64_t(_byte_size/sizeof(Type));
 
 			_status = ftruncate(file_descriptor, _byte_size);
 			if(_status)
@@ -108,14 +107,14 @@ class C_Buffer{
 		}
 
 
-		char* get_Sample(unsigned int arg_sample_number){
+		char* get_Sample(uint64_t arg_sample_number){
 			//calculate index:
-			unsigned int index = arg_sample_number;
+			uint64_t index = arg_sample_number;
+
 			if(arg_sample_number > _sample_amount){				
 
-				index = arg_sample_number % _sample_amount;
-				
-				printf("index is : %i, %i\n",index);
+				index = arg_sample_number % _sample_amount;				
+				//printf("index is : %i, %i\n",index);
 			}
 
 			return _address + (index * sizeof(Type));
@@ -129,16 +128,16 @@ class C_Buffer{
 			return _end_address;
 		}
 
-		unsigned int get_Buffer_Size(){
+		uint32_t get_Buffer_Size(){
 			return _byte_size;
 		}
 
 
 
 	private:
-		unsigned int _byte_size; //number of bytes the buffer fills in virtual memory:
-		unsigned int _read_offset; //
-		unsigned int _write_offset; //
+		uint32_t _byte_size; //number of bytes the buffer fills in virtual memory:
+		uint32_t _read_offset; //
+		uint32_t _write_offset; //
 		//unsigned long _count_bytes;
 		char* _address; //
 		char* _start_address; //
@@ -146,9 +145,9 @@ class C_Buffer{
 
 		std::string  _path;
 
-		unsigned int _status; //debug variable.
-		unsigned int _sample_size; //byte size of each sample.
-		unsigned int _sample_amount;
+		uint32_t _status; //debug variable.
+		uint32_t _sample_size; //byte size of each sample.
+		uint64_t _sample_amount;
 
 };
 #endif // C_BUFFER_HPP

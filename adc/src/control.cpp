@@ -29,14 +29,11 @@
 #include<sys/stat.h>
 
 #include<err.h>
-#include<fcntl.h>
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include<unistd.h>
 #include<cstdint>
-#include<fstream>
-#include<iostream>
+#include<vector>
+#include<algorithm>
+#include<iterator>
+#include<sstream>
 
 //C11 threading:
 #include<atomic>
@@ -46,11 +43,12 @@
 #include "c_buffer.hpp"
 #include "../build/bat.h"
 
+using namespace std;
+
 float _sample_rate = 30e5;
-int _snapshot_size = (int)10e6;
 
 void stop_recording();
-void snapshot(int arg_byte_size, int arg_sample_number);
+void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]);
 void start_recording(char arg_device[], float arg_sample_rate, 
 		char* arg_start_address, char* arg_end_address, int arg_buffer_size);
 
@@ -59,7 +57,7 @@ bool _recording = false;
 //status integer:
 int ret = 0;
 
-std::thread* _record_thread;
+thread* _record_thread;
 
 struct Sample{
 	uint16_t sample[8];
@@ -73,15 +71,15 @@ int main(int argc, char *argv[]){
 
 	//open the cmd pipe:
 	FILE* f_pipe;
-	char f_buffer[96];
+	char f_buffer[1024];
 	char filename[] = "/home/pi/grapper.cmd";
 	char device[] = "/dev/comedi0";
 
-	std::string cmd_exit = "exit";
-	std::string cmd_start_rec = "start_rec";
-	std::string cmd_stop_rec = "stop_rec";
-	std::string cmd_take_snapshot = "take_snapshot";
-	std::string input;
+	string cmd_exit = "exit";
+	string cmd_start_rec = "start_rec";
+	string cmd_stop_rec = "stop_rec";
+	string cmd_take_snapshot = "take_snapshot";
+	string input;
 
 	printf("CMDs available are \n");
 	printf("'exit'\texits the grapper\n");
@@ -93,53 +91,63 @@ int main(int argc, char *argv[]){
 	printf("Creating Pipe... Waiting for receiver process...\n\n");
 	//TRY TO CRATE A NAMED PIPE
 	if (mkfifo(filename,0666)<0){
-		perror("FIFO (named pipe) could not be created, it exists allready?");
+		perror("FIFO (named pipe) could not be created, it exists already?");
 		//exit(-1);
 	}
 
-	while(1){	
-		sleep(1);;
-		f_pipe = fopen(filename, "r");
-		fgets(f_buffer, 96, f_pipe);
+	f_pipe = fopen(filename, "r");
+	
+	while(1){
+
+
+		fgets(f_buffer, 1024, f_pipe);
 		input = f_buffer;
-		//remove end of line:
-		input = input.substr(0,input.length()-1);
 		printf("input is %s\n", input.c_str());
 
-		if(cmd_start_rec.compare(input) == 0){
+		//Split the input string up and put comman and it's arguments in a vector:		
+		istringstream iss(input);
+		vector<string> input_data{istream_iterator<string>{iss},
+			istream_iterator<string>{}};
+
+
+		if(cmd_start_rec.compare(input_data[0]) == 0){
 			if(_recording){
 				printf("System is recording, you need to stop ('stop_rec') it to restart it\n");
 
 			}else{
 				printf("Starting recording at %f[Hz]\n", _sample_rate);
 
-				_record_thread = new std::thread(start_recording, device, 
+				_record_thread = new thread(start_recording, device, 
 						_sample_rate, _c_buffer.get_Start_Address(),
 						_c_buffer.get_End_Address(), _c_buffer.get_Buffer_Size());
 			}
 		}
 
-		else if(cmd_stop_rec.compare(input) == 0){
+		else if(cmd_stop_rec.compare(input_data[0]) == 0){
 			if(!_recording){
 				printf("System is not recording, no need to stop it\n");			
 			}else{
 				printf("Stopping recording now\n");
-				stop_recording();			
+				stop_recording();		
+				sleep(1);			
 			}
 
 		}
 
-		else if(cmd_take_snapshot.compare(input.substr(0,13)) == 0){
-			input = input.substr(14, input.length()-1);
-			int sample_number = atoi(input.c_str());
-			if(sample_number >= 1){
-				printf("taking snapshot, sample %i\n",sample_number);
-				std::thread s_thread(snapshot,_snapshot_size,sample_number);
-				s_thread.detach();
-			}else printf("cancelling snapshot, sample number: %i\n", sample_number);
+		else if(cmd_take_snapshot.compare(input_data[0]) == 0){
+
+			uint64_t sample_from = stoull(input_data[1]);
+			uint64_t sample_to = stoull(input_data[2]);
+			string path = input_data[3];
+
+			printf("taking snapshot, path is: %s\n"
+					,path.c_str());
+			
+			thread s_thread(snapshot, sample_from, sample_to, path.c_str());
+			s_thread.detach();
 		}
 
-		else if(cmd_exit.compare(input) == 0){
+		else if(cmd_exit.compare(input_data[0]) == 0){
 			if(_recording){
 				printf("stopping recording\n");
 				stop_recording();
@@ -149,111 +157,112 @@ int main(int argc, char *argv[]){
 		}else
 			printf("Command '%s' unknown\n", input.c_str());
 
-		fclose(f_pipe);
+			}
+			if (unlink(filename)<0){
+				perror("Error deleting pipe file.");
+				exit(-1);
+			}
+			fclose(f_pipe);
+
+			printf("exiting \n");
 	}
-	if (unlink(filename)<0){
-		perror("Error deleting pipe file.");
-		exit(-1);
+
+	void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]){
+		//get rid of ekstra bytes:
+		//and ensure that one whole samples are saved:
+
+		uint32_t byte_size = (arg_sample_to - arg_sample_from)*(sizeof(Sample)) ; 
+
+
+		char *snapshot_space;
+		char *buffer_ptr;
+
+		buffer_ptr = _c_buffer.get_Sample(arg_sample_from);
+
+		//allocate anonymous memmap for the snapshot data:
+		snapshot_space = (char*)mmap(NULL,byte_size, 
+				PROT_READ | PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);
+
+		if(snapshot_space == MAP_FAILED)
+			errx(1,"snapshot allocation failed");
+
+		//copy the snapshot data into the empty memmap:
+		memcpy(snapshot_space, buffer_ptr, byte_size);
+
+		//save memmap data to disk:
+		FILE *s_file;
+		s_file = fopen(arg_path, "wb");
+		fwrite (snapshot_space, sizeof(char), byte_size, s_file);	
+		fclose(s_file);
+		//clear mmap:
+		munmap(snapshot_space,byte_size);
 	}
-	fclose(f_pipe);
-
-	printf("exiting \n");
-}
-
-void snapshot(int arg_byte_size, int arg_sample_number){
-	//get rid of ekstra bytes:
-	//and ensure that one whole samples are saved:
-	int byte_size = arg_byte_size/sizeof(Sample) * sizeof(Sample); 
-
-	char *snapshot_space;
-	char *buffer_ptr;
-
-	buffer_ptr = _c_buffer.get_Sample(arg_sample_number);
-
-	snapshot_space = (char*)mmap(NULL,byte_size, 
-			PROT_READ | PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);
-
-	if(snapshot_space == MAP_FAILED)
-		errx(1,"snapshot allocation failed");
-
-	memcpy(snapshot_space, buffer_ptr, byte_size);
-
-	//save mmap to disk:
-	FILE *s_file;
-	char name_buf[1024];
-	sprintf(name_buf,"snapshot,%i",arg_sample_number);
-	s_file = fopen(name_buf, "wb");
-	fwrite (snapshot_space, sizeof(char), byte_size, s_file);	
-	fclose(s_file);
-	//clear mmap:
-	munmap(snapshot_space,byte_size);
-}
 
 
-void start_recording(char arg_device[], float arg_sample_rate, 
-		char* arg_start_address, char* arg_end_address, int arg_buffer_size){
+	void start_recording(char arg_device[], float arg_sample_rate, 
+			char* arg_start_address, char* arg_end_address, int arg_buffer_size){
 
-	_recording = true;
+		_recording = true;
 
-	_recorder.start_Sampling(arg_device, arg_sample_rate, 
-			arg_start_address, arg_end_address, arg_buffer_size);
+		_recorder.start_Sampling(arg_device, arg_sample_rate, 
+				arg_start_address, arg_end_address, arg_buffer_size);
 
-}
+	}
 
-void stop_recording(){
-	_recorder.stop_Sampling();
+	void stop_recording(){
+		_recorder.stop_Sampling();
 
-	_recording = false;
-}
+		_recording = false;
+	}
 
 
 
 
 
-/*
-   FILE *fp;
-   char readbuf[1024];
-   char _filename[] = "pipe.txt";
+	/*
+	   FILE *fp;
+	   char readbuf[1024];
+	   char _filename[] = "pipe.txt";
 
-   std::string cmd_exit = "exit";
-   std::string input;
+	   string cmd_exit = "exit";
+	   string input;
 
-   umask(0);
-   mknod(_filename,S_IFIFO|0666,0);
+	   umask(0);
+	   mknod(_filename,S_IFIFO|0666,0);
 
-/*  while(cmd_exit.compare(input)){
-fp = fopen(_filename,"r");
-fgets(readbuf,1024,fp);
-input = readbuf;
-input = input.substr(0,input.length()-1);
-//printf("Recieved string: %s\n",readbuf);
-fclose(fp);
-printf("pipe line: %s\n", input.c_str());
-}
-printf("exit pushed\n");
+	/*  while(cmd_exit.compare(input)){
+	fp = fopen(_filename,"r");
+	fgets(readbuf,1024,fp);
+	input = readbuf;
+	input = input.substr(0,input.length()-1);
+	//printf("Recieved string: %s\n",readbuf);
+	fclose(fp);
+	printf("pipe line: %s\n", input.c_str());
+	}
+	printf("exit pushed\n");
 
-return 0;
+	return 0;
 
 
-//while(std::getline(_fifo,cmd)){				
+	//while(getline(_fifo,cmd)){				
 
-//	read(_file_descriptor, _buffer, 1024);
-//	cmd = _buffer;
-//	printf("Received: %s\n", _buffer);		
+	//	read(_file_descriptor, _buffer, 1024);
+	//	cmd = _buffer;
+	//	printf("Received: %s\n", _buffer);		
 
-//}
+	//}
 
-//unlink(_fifo);
-//printf("size of sample %i, sizeof\n", sizeof(sample1));
+	//unlink(_fifo);
+	//printf("size of sample %i, sizeof\n", sizeof(sample1));
 
-printf("this is seomething else, my PID is %i\n",getpid());
+	printf("this is seomething else, my PID is %i\n",getpid());
 
-//int sample[] = {5,4,3,2};
-uint8_t something = 3;
+	//int sample[] = {5,4,3,2};
+	uint8_t something = 3;
 
-printf("testing values %d, %d \n", sizeof(something), something);
+	printf("testing values %d, %d \n", sizeof(something), something);
 
-for(int i = 0; i<1e6; i++){
+	for(int i = 0; i<1e6; i++){
 //printf("%d\t", i);
 Sample sample;
 sample.x = i;
@@ -284,12 +293,12 @@ printf("testing sample %i,%i\n",(++test_sample2)->x, (++test_sample2)->y);
 }
 
 int cmd_Interpreter(){
-//create named pipe.
-}
+	//create named pipe.
+	}
 
-int cleanup(){
+	int cleanup(){
 
-}
+	}
 
 
 */
