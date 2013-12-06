@@ -44,13 +44,14 @@ class Recorder{
 			}
 
 
-		int start_Sampling(char* arg_device, float arg_sample_rate, 
+		int start_Sampling(char* arg_device, uint32_t arg_sample_rate, 
 				char* arg_start_address, char* arg_end_address, int arg_buffer_size){
 
 			_channel_amount = 16;
+			_sample_rate = arg_sample_rate;
 
 			unsigned int chanlist[_channel_amount];
-			unsigned int convert_arg = (unsigned int) 1e9 / arg_sample_rate;
+			unsigned int convert_arg = 1e9 / _sample_rate;
 			int ret;
 
 			comedi_cmd *cmd = (comedi_cmd *) calloc(1, sizeof(comedi_cmd));
@@ -127,13 +128,12 @@ class Recorder{
 		}
 
 
-			private:
+	private:
 
-		std::atomic_bool _stop;
-
-		float _sample_rate;
+		uint32_t _sample_rate;
 		int _channel_amount;
+		std::atomic_bool _stop;
 		FILE* _dux_fp;
 		comedi_t* _device;
-		};
+};
 #endif // RECORDER_HPP

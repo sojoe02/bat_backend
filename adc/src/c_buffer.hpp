@@ -27,6 +27,7 @@
 #include <err.h>
 #include <stdio.h>
 #include <string.h>
+
 #include <string>
 
 template <class Type>
@@ -136,8 +137,8 @@ class C_Buffer{
 
 	private:
 		uint32_t _byte_size; //number of bytes the buffer fills in virtual memory:
-		uint32_t _read_offset; //
 		uint32_t _write_offset; //
+		uint32_t _read_offset; //
 		//unsigned long _count_bytes;
 		char* _address; //
 		char* _start_address; //

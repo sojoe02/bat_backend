@@ -45,11 +45,11 @@
 
 using namespace std;
 
-float _sample_rate = 30e5;
+uint32_t _sample_rate = (uint32_t)30e5;
 
 void stop_recording();
 void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]);
-void start_recording(char arg_device[], float arg_sample_rate, 
+void start_recording(char arg_device[], uint32_t arg_sample_rate, 
 		char* arg_start_address, char* arg_end_address, int arg_buffer_size);
 
 bool _running = true;
@@ -116,7 +116,7 @@ int main(int argc, char *argv[]){
 				printf("System is recording, you need to stop ('stop_rec') it to restart it\n");
 
 			}else{
-				printf("Starting recording at %f[Hz]\n", _sample_rate);
+				printf("Starting recording at %u[Hz]\n", _sample_rate);
 
 				_record_thread = new thread(start_recording, device, 
 						_sample_rate, _c_buffer.get_Start_Address(),
@@ -127,7 +127,7 @@ int main(int argc, char *argv[]){
 		else if(cmd_set_sr.compare(input_data[0])==0){
 			if(!_recording && input_data.size() >= 2){
 				_sample_rate = stoi(input_data[1]);
-				printf("Sample rate set to %i[hz]",_sample_rate);
+				printf("Sample rate set to %u[hz]",_sample_rate);
 			}else{
 				printf("Not enough arguments, to adjust samplerate");
 				printf("or system is recording!\n");
@@ -212,7 +212,7 @@ void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_p
 }
 
 
-void start_recording(char arg_device[], float arg_sample_rate, 
+void start_recording(char arg_device[], uint32_t arg_sample_rate, 
 		char* arg_start_address, char* arg_end_address, int arg_buffer_size){
 
 	_recording = true;
@@ -227,93 +227,5 @@ void stop_recording(){
 
 	_recording = false;
 }
-
-
-
-
-
-/*
-   FILE *fp;
-   char readbuf[1024];
-   char _filename[] = "pipe.txt";
-
-   string cmd_exit = "exit";
-   string input;
-
-   umask(0);
-   mknod(_filename,S_IFIFO|0666,0);
-
-/*  while(cmd_exit.compare(input)){
-fp = fopen(_filename,"r");
-fgets(readbuf,1024,fp);
-input = readbuf;
-input = input.substr(0,input.length()-1);
-//printf("Recieved string: %s\n",readbuf);
-fclose(fp);
-printf("pipe line: %s\n", input.c_str());
-}
-printf("exit pushed\n");
-
-return 0;
-
-
-//while(getline(_fifo,cmd)){				
-
-//	read(_file_descriptor, _buffer, 1024);
-//	cmd = _buffer;
-//	printf("Received: %s\n", _buffer);		
-
-//}
-
-//unlink(_fifo);
-//printf("size of sample %i, sizeof\n", sizeof(sample1));
-
-printf("this is seomething else, my PID is %i\n",getpid());
-
-//int sample[] = {5,4,3,2};
-uint8_t something = 3;
-
-printf("testing values %d, %d \n", sizeof(something), something);
-
-for(int i = 0; i<1e6; i++){
-//printf("%d\t", i);
-Sample sample;
-sample.x = i;
-sample.y = i;
-//sample.f = i;
-buffer.write_Samples(sample);
-//if(i % (int)1e7 == 0){
-//	printf("sample: %i\n",i);
-//}
-}
-
-
-Recorder recorder;
-
-
-char device[] = "/dev/comedi0";
-recorder.start_Sampling(device, 30e5, buffer.get_Start_Address(), 
-buffer.get_End_Address(), buffer.get_Buffer_Size());
-
-//buffer.print_Buffer();
-//
-Sample* test_sample = buffer.get_Sample(34);
-printf("testing sample %i,%i\n",test_sample->x, test_sample->y);
-
-Sample* test_sample2 = ++test_sample;
-printf("testing sample %i,%i\n",(++test_sample2)->x, (++test_sample2)->y);
-
-}
-
-int cmd_Interpreter(){
-//create named pipe.
-}
-
-int cleanup(){
-
-}
-
-
-*/
 
 
