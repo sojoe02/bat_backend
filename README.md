@@ -8,5 +8,10 @@ Alpha version perl scripts that auto-configures the networking, and ranks every 
 Part 2:
 A data grapper(C++), that graps data from a USBDUX device, and places it in a cirular buffer. The user can take snapshots of the buffer via a named pipe.
 
+This is the 'malte' branch, to push changes made on this branch use:
+git push <remote origin> malte
+
+
+
 Author: Soeren V. Joergensen, svjo@mmmi.sdu.dk
 Organization: MMMI, University of Sourthern Denmark.
