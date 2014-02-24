@@ -211,7 +211,8 @@ void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_p
 	munmap(snapshot_space,byte_size);
 }
 
-
+//wouldn't this do basically what I need? Investigate start_address,
+//end_address (fixed time/snaphot?) if those pose a problem --mhs
 void start_recording(char arg_device[], uint32_t arg_sample_rate, 
 		char* arg_start_address, char* arg_end_address, int arg_buffer_size){
 

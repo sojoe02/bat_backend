@@ -43,9 +43,9 @@ class Recorder{
 				
 			}
 
-
+		//use following function for recording? --mhs
 		int start_Sampling(char* arg_device, uint32_t arg_sample_rate, 
-				char* arg_start_address, char* arg_end_address, int arg_buffer_size){
+				char* arg_start_address, char* arg_end_address, int arg_buffer_size){ 
 
 			_channel_amount = 16;
 			_sample_rate = arg_sample_rate;
@@ -58,16 +58,18 @@ class Recorder{
 			_device = comedi_open(arg_device);
 
 
-			int buffer = 1048576;
+			int buffer = 1048576; //why? unimportant information, but nice-to-know --mhs
 			if(comedi_set_max_buffer_size(_device, 0, buffer) < 0 ){
 				printf("Failed to set max buffer size to %ikB\n", buffer);
 				return -1;
-			} else printf("Maximum buffer size set to %iB\n", comedi_get_max_buffer_size(_device,0));
+			} else printf("Maximum buffer size set to %iB\n", comedi_get_max_buffer_size(_device,0)); 
+			//optimization: replacing the call (comedi_get_max...) with a call to var buffer. --mhs
 
 			if(comedi_set_buffer_size(_device, 0, buffer) < 0){
 				printf("Failed to set buffer size to %iBytes\n", buffer);
 				return -1;
 			} else printf("Buffer size set to %iBytes\n", comedi_get_buffer_size(_device,0));
+			//optimization: replacing the call (comedi_get_max...) with a call to var buffer. --mhs
 
 			if(!_device){
 				errx(1, "unable to open device");
@@ -100,14 +102,15 @@ class Recorder{
 				return -1;
 			}
 
-			FILE* dux_fp;
+			FILE* dux_fp; //what's this for? --mhs
 
 			if((dux_fp = fdopen(comedi_fileno(_device), "r")) <= 0)
 				comedi_perror("fdopen");
 
-			char* write_address = arg_start_address;
+			char* write_address = arg_start_address; 
+			//an address that the program writes to. Might be this --mhs
 
-			while((ret = fread(write_address, 1, 4096,dux_fp)) >= 0){
+			while((ret = fread(write_address, 1, 4096, dux_fp)) >= 0){
 				write_address+=4096;
 
 				if(write_address == arg_end_address){

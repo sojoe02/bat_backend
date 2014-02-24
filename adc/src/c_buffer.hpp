@@ -64,6 +64,7 @@ class C_Buffer{
 
 			printf("total amount of samples available %f\n", (double)_byte_size/(double)sizeof(Type));
 			_sample_amount = uint64_t(_byte_size/sizeof(Type));
+			//optimization: Why calculate the same number twice? --mhs
 
 			_status = ftruncate(file_descriptor, _byte_size);
 			if(_status)
