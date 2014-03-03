@@ -31,8 +31,10 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-
+#include <condition_variable>
 #include <atomic>
+
+#include "utility.h"
 
 class Recorder{
 
@@ -107,8 +109,18 @@ class Recorder{
 
 			char* write_address = arg_start_address;
 
+			Utility::WRITTEN_BLOCK = 0;
+			uint32_t tmp_block = 0;
+
 			while((ret = fread(write_address, 1, 4096,dux_fp)) >= 0){
 				write_address+=4096;
+				Utility::WRITTEN_BLOCK+=1;
+				tmp_block+=0;
+
+				if(tmp_block >= Utility::SNAPSHOT_BLOCK_SIZE){
+					tmp_block = 0;
+					Utility::CV.notify_one();				
+				}
 
 				if(write_address == arg_end_address){
 					write_address -= arg_buffer_size;

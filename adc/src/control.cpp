@@ -38,12 +38,17 @@
 //C11 threading:
 #include<atomic>
 #include<thread>
+#include<condition_variable>
 
 #include "recorder.hpp"
 #include "c_buffer.hpp"
 #include "../build/bat.h"
 
 using namespace std;
+
+uint32_t Utility::SNAPSHOT_BLOCK_SIZE = 4096;
+uint32_t Utility::WRITTEN_BLOCK = 0;
+std::condition_variable Utility::CV;
 
 uint32_t _sample_rate = (uint32_t)30e5;
 
@@ -80,6 +85,7 @@ int main(int argc, char *argv[]){
 	string cmd_stop_rec = "stop_rec";
 	string cmd_take_snapshot = "snapshot";
 	string cmd_set_sr = "set_sr";
+	string cmd_take_snaphot_series ="serial_snapshot";
 	string input;
 
 	printf("CMDs available are \n");
@@ -158,6 +164,16 @@ int main(int argc, char *argv[]){
 
 			thread s_thread(snapshot, sample_from, sample_to, path.c_str());
 			s_thread.detach();
+		}
+
+		else if(cmd_take_snaphot_series.compare(input_data[0]) == 0){
+			uint32_t sample_amount = stoull(input_data[1]);
+			uint32_t snapshot_amount = stoull(input_data[2]);
+			string path = input_data[3];
+
+			printf("taking snapshot series, to path: %s\n", path.c_str());
+		
+		
 		}
 
 		else if(cmd_exit.compare(input_data[0]) == 0){
