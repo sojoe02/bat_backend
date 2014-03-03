@@ -38,6 +38,7 @@
 //C11 threading:
 #include<atomic>
 #include<thread>
+#include<mutex>
 #include<condition_variable>
 
 #include "recorder.hpp"
@@ -48,7 +49,9 @@ using namespace std;
 
 uint32_t Utility::SNAPSHOT_BLOCK_SIZE = 4096;
 uint32_t Utility::WRITTEN_BLOCK = 0;
+uint64_t Utility::ACTIVE_SAMPLE = 0;
 std::condition_variable Utility::CV;
+std::mutex Utility::LM;
 
 uint32_t _sample_rate = (uint32_t)30e5;
 
@@ -59,6 +62,8 @@ void start_recording(char arg_device[], uint32_t arg_sample_rate,
 
 bool _running = true;
 bool _recording = false;
+bool _serial_snapshotting = false;
+bool _snap_wait = false;
 //status integer:
 int ret = 0;
 
@@ -167,8 +172,9 @@ int main(int argc, char *argv[]){
 		}
 
 		else if(cmd_take_snaphot_series.compare(input_data[0]) == 0){
-			uint32_t sample_amount = stoull(input_data[1]);
-			uint32_t snapshot_amount = stoull(input_data[2]);
+			
+			//uint32_t sample_amount = stoull(input_data[1]);
+			//uint32_t snapshot_amount = stoull(input_data[2]);
 			string path = input_data[3];
 
 			printf("taking snapshot series, to path: %s\n", path.c_str());
@@ -194,6 +200,37 @@ int main(int argc, char *argv[]){
 	fclose(f_pipe);
 
 	printf("exiting \n");
+}
+
+
+void serial_snapshot(uint32_t arg_snapshot_amount, const char arg_path[]){
+
+	std::unique_lock<std::mutex> lk(Utility::LM);
+	char path[sizeof(arg_path)+4];
+	int i = 0;
+	char* buffer_ptr;
+	uint32_t byte_size = (arg_snapshot_amount * sizeof(Sample));
+
+	_serial_snapshotting = true;
+
+	while(_serial_snapshotting == true){
+
+		Utility::CV.wait(lk,[]{return _snap_wait;});
+		//generate the path:
+		sprintf(path, "%s_%03d", arg_path, i);
+		printf("Writing snapshot %s", path);
+		//write the snapshot:
+		buffer_ptr = _c_buffer.get_Sample(Utility::ACTIVE_SAMPLE - arg_snapshot_amount);
+
+		FILE *s_file;
+		s_file = fopen(arg_path,"wb");
+		fwrite(buffer_ptr, sizeof(char), byte_size, s_file);
+		fclose(s_file);	
+		i++;
+	
+	}
+	lk.unlock();
+
 }
 
 void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]){
