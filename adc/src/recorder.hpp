@@ -36,6 +36,8 @@
 
 #include "utility.h"
 
+template <class Type>
+
 class Recorder{
 
 	public:
@@ -109,19 +111,18 @@ class Recorder{
 
 			char* write_address = arg_start_address;
 
-			Utility::WRITTEN_BLOCK = 0;
+			
+			block_size = sizeof(Type) * 1024;
 			Utility::ACTIVE_SAMPLE = 0;
 			uint64_t active_sample = 0;
 			uint32_t tmp_block = 0;
-			int samples_pr_block = 4096/8;
+			int samples_pr_block = 1024;
 
-			while((ret = fread(write_address, 1, 4096,dux_fp)) >= 0){
+			while((ret = fread(write_address, 1, block_size,dux_fp)) >= 0){
 
-				write_address+=4096;
-				//Utility::WRITTEN_BLOCK+=1;
-				tmp_block+=1;
+				write_address += block_size;
+				tmp_block += 1;
 				active_sample += samples_pr_block;
-				//Utility::ACTIVE_SAMPLE += samples_pr_block;
 
 				if(tmp_block >= Utility::SNAPSHOT_BLOCK_SIZE){
 					tmp_block = 0;
@@ -154,5 +155,6 @@ class Recorder{
 		std::atomic_bool _stop;
 		FILE* _dux_fp;
 		comedi_t* _device;
+		int block_size;
 };
 #endif // RECORDER_HPP
