@@ -62,11 +62,11 @@ class Recorder{
 			_device = comedi_open(arg_device);
 
 
-			int buffer = 1048576;
+			int buffer = 1048576*4;
 			if(comedi_set_max_buffer_size(_device, 0, buffer) < 0 ){
-				printf("Failed to set max buffer size to %ikB\n", buffer);
+				printf("Failed to set max buffer size to %i bytes\n", buffer);
 				return -1;
-			} else printf("Maximum buffer size set to %iB\n", comedi_get_max_buffer_size(_device,0));
+			} else printf("Maximum buffer size set to %i bytes\n", comedi_get_max_buffer_size(_device,0));
 
 			if(comedi_set_buffer_size(_device, 0, buffer) < 0){
 				printf("Failed to set buffer size to %iBytes\n", buffer);
@@ -110,27 +110,32 @@ class Recorder{
 				comedi_perror("fdopen");
 
 			char* write_address = arg_start_address;
-
 			
-			block_size = sizeof(Type) * 1024;
-			Utility::ACTIVE_SAMPLE = 0;
+			Utility::SNAP_SAMPLE = 0;
+			Utility::LAST_SAMPLE = 0;
+
 			uint64_t active_sample = 0;
 			uint32_t tmp_block = 0;
-			int samples_pr_block = 1024;
+			int samples_pr_block = 4096/sizeof(Type);
 
-			while((ret = fread(write_address, 1, block_size,dux_fp)) >= 0){
+		
+			while((ret = fread(write_address, 1, 4096,dux_fp)) >= 0){
 
-				write_address += block_size;
+				write_address += 4096;
 				tmp_block += 1;
+
 				active_sample += samples_pr_block;
 
 				if(tmp_block >= Utility::SNAPSHOT_BLOCK_SIZE){
 					tmp_block = 0;
-					Utility::ACTIVE_SAMPLE = active_sample;
+					Utility::SNAP_SAMPLE = active_sample;
 					Utility::CV.notify_one();
 				}
 
 				if(write_address == arg_end_address){
+					
+					Utility::LAST_SAMPLE = active_sample;
+
 					write_address -= arg_buffer_size;
 					printf("resetting to beginning of buffer\n");
 				}

@@ -56,7 +56,8 @@ uint32_t Utility::SNAPSHOT_BYTE_SIZE = 152e6;
 std::atomic_uint Utility::SNAPSHOT_BLOCK_SIZE;
 std::atomic_uint Utility::WRITTEN_BLOCK;
 
-uint64_t Utility::ACTIVE_SAMPLE = 0;
+std::atomic_uint_least64_t Utility::SNAP_SAMPLE;
+std::atomic_uint_least64_t Utility::LAST_SAMPLE;
 
 std::condition_variable Utility::CV;
 std::mutex Utility::LM;
@@ -66,8 +67,8 @@ uint32_t _sample_rate = (uint32_t)30e5;
 void stop_recording();
 void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]);
 void start_recording(char arg_device[], uint32_t arg_sample_rate, 
-		char* arg_start_address, char* arg_end_address, int arg_buffer_size);
-void serial_snapshot(uint32_t arg_snapshot_amount, const char arg_path[]);
+char* arg_start_address, char* arg_end_address, int arg_buffer_size);
+void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uint32_t arg_count, const char arg_path[]);
 
 bool _recording = false;
 std::atomic_bool _serial_snapshotting;
@@ -88,6 +89,8 @@ Recorder<Sample> _recorder;
 int main(int argc, char *argv[]){
 
 	_serial_snapshotting = false;
+	Utility::SNAPSHOT_BLOCK_SIZE = (uint32_t)152e6/4096;
+
 	//open the cmd pipe:
 	FILE* f_pipe;
 	char f_buffer[1024];
@@ -122,8 +125,9 @@ int main(int argc, char *argv[]){
 	//-----------------------------------------------------//
 
 	umask(0);
+	remove (filename);
 
-	printf("Creating Pipe... Waiting for receiver process...\n\n");
+	printf("Creating Pipe; %s, Waiting for receiver process...\n\n", filename);
 	//TRY TO CRATE A NAMED PIPE
 	if (mkfifo(filename,0666)<0){
 		perror("FIFO (named pipe) could not be created");
@@ -168,8 +172,6 @@ int main(int argc, char *argv[]){
 				printf("Not enough arguments, to adjust samplerate");
 				printf("or system is recording!\n");
 			}
-
-
 		}
 
 		else if(cmd_stop_rec.compare(input_data[0]) == 0){
@@ -180,17 +182,14 @@ int main(int argc, char *argv[]){
 				stop_recording();		
 				sleep(1);			
 			}
-
 		}
 
 		else if(cmd_take_snapshot.compare(input_data[0]) == 0){
-
 			uint64_t sample_from = stoull(input_data[1]);
 			uint64_t sample_to = stoull(input_data[2]);
 			string path = input_data[3];
 
 			printf("taking snapshot, path is: %s\n",path.c_str());
-	
 
 			thread s_thread(snapshot, sample_from, sample_to, path.c_str());
 			s_thread.detach();
@@ -198,11 +197,17 @@ int main(int argc, char *argv[]){
 
 		else if(cmd_take_snapshot_series.compare(input_data[0]) == 0){
 
-			uint32_t snapshot_bytes = stoull(input_data[1]);
-			uint32_t snapshot_amount = stoull(input_data[2]);
-			string path = input_data[3];
+			uint32_t sample_number = stoull(input_data[1]);
+			uint32_t sample_length = stoull(input_data[2]);
+			uint32_t count = stoull(input_data[3]);
 
-			if (snapshot_bytes > Utility::SNAPSHOT_MAX_BYTE_SIZE){
+			string path = input_data[4];
+
+			
+			
+			printf("taking snapshots in sequence\n");
+
+			if (sample_length * sizeof(Sample) > Utility::SNAPSHOT_MAX_BYTE_SIZE){
 				printf("snapshot size too large, maximum is %i ; aborting\n", Utility::SNAPSHOT_MAX_BYTE_SIZE);
 
 			} else if(_serial_snapshotting){
@@ -210,13 +215,16 @@ int main(int argc, char *argv[]){
 			}
 			else if(!_recording)	{
 				printf("system is not recording; aborting\n");
+			} 
+			else if(sample_number < Utility::LAST_SAMPLE ){
+				printf("the sample you want is obsolete\n");
 			}
 			else{
-				Utility::SNAPSHOT_BLOCK_SIZE = snapshot_bytes/sizeof(Sample);
-				Utility::SNAPSHOT_BYTE_SIZE = (snapshot_bytes/sizeof(Sample)) * sizeof(Sample);
+				Utility::SNAPSHOT_BLOCK_SIZE = sample_length/4096;
+				Utility::SNAPSHOT_BYTE_SIZE = sample_length * sizeof(Sample);
 
 				printf("starting serial snapshot thread, to path: %s\n", path.c_str());		
-				thread s_thread(serial_snapshot, snapshot_amount ,path.c_str());
+				thread s_thread(serial_snapshot, sample_number , sample_length, count, path.c_str());
 				s_thread.detach();
 
 			}
@@ -253,27 +261,28 @@ int main(int argc, char *argv[]){
 	@param arg_snapshot_amount amounts of snap shots.
 	@param arg_path the path the snapshots will be written to.
 */
-void serial_snapshot(uint32_t arg_snapshot_amount, const char arg_path[]){
+void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uint32_t arg_count, const char arg_path[]){
 
 	std::unique_lock<std::mutex> lk(Utility::LM);
-	char path[sizeof(arg_path)+4];
+	char path[1024];
 	
 	char* buffer_ptr;
 	uint32_t byte_size = Utility::SNAPSHOT_BYTE_SIZE;
 	uint32_t samples_pr_snapshot = Utility::SNAPSHOT_BYTE_SIZE / sizeof(Sample);
-		
-
+	
 	_serial_snapshotting = true;
 
 	uint32_t i = 0;
-	while( _serial_snapshotting == true && arg_snapshot_amount >= i ){
+	while( _serial_snapshotting == true && arg_count >= i ){
 
 		Utility::CV.wait(lk,[]{return _snap_wait;});
 		//generate the path:
-		sprintf(path, "%s_%03d", arg_path, i);
+
+		sprintf(path, "%s.%llX.%u", arg_path, (uint64_t)Utility::SNAP_SAMPLE, i);
+		
 		printf("Writing snapshot %s", path);
 		//write the snapshot:
-		buffer_ptr = _c_buffer.get_Sample( Utility::ACTIVE_SAMPLE -  samples_pr_snapshot);
+		buffer_ptr = _c_buffer.get_Sample( Utility::SNAP_SAMPLE -  samples_pr_snapshot);
 
 		FILE *s_file;
 		s_file = fopen(arg_path,"wb");
