@@ -47,9 +47,17 @@
 
 using namespace std;
 
-uint32_t Utility::SNAPSHOT_BLOCK_SIZE = 4096;
-uint32_t Utility::WRITTEN_BLOCK = 0;
+//set circle buffer size:
+uint32_t BUFFER_SIZE = 190e6;
+
+uint32_t Utility::SNAPSHOT_MAX_BYTE_SIZE = 152e6;
+uint32_t Utility::SNAPSHOT_BYTE_SIZE = 152e6;
+
+std::atomic_uint Utility::SNAPSHOT_BLOCK_SIZE;
+std::atomic_uint Utility::WRITTEN_BLOCK;
+
 uint64_t Utility::ACTIVE_SAMPLE = 0;
+
 std::condition_variable Utility::CV;
 std::mutex Utility::LM;
 
@@ -59,10 +67,10 @@ void stop_recording();
 void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]);
 void start_recording(char arg_device[], uint32_t arg_sample_rate, 
 		char* arg_start_address, char* arg_end_address, int arg_buffer_size);
+void serial_snapshot(uint32_t arg_snapshot_amount, const char arg_path[]);
 
-bool _running = true;
 bool _recording = false;
-bool _serial_snapshotting = false;
+std::atomic_bool _serial_snapshotting;
 bool _snap_wait = false;
 //status integer:
 int ret = 0;
@@ -74,11 +82,12 @@ struct Sample{
 };
 
 
-C_Buffer<Sample> _c_buffer(190e6);
+C_Buffer<Sample> _c_buffer(BUFFER_SIZE);
 Recorder _recorder;
 
 int main(int argc, char *argv[]){
 
+	_serial_snapshotting = false;
 	//open the cmd pipe:
 	FILE* f_pipe;
 	char f_buffer[1024];
@@ -90,7 +99,8 @@ int main(int argc, char *argv[]){
 	string cmd_stop_rec = "stop_rec";
 	string cmd_take_snapshot = "snapshot";
 	string cmd_set_sr = "set_sr";
-	string cmd_take_snaphot_series ="serial_snapshot";
+	string cmd_take_snapshot_series ="serial_snapshot";
+	string cmd_stop_snapshot_series ="serial_stop";
 	string input;
 
 	printf("CMDs available are \n");
@@ -164,22 +174,41 @@ int main(int argc, char *argv[]){
 			uint64_t sample_to = stoull(input_data[2]);
 			string path = input_data[3];
 
-			printf("taking snapshot, path is: %s\n"
-					,path.c_str());
+			printf("taking snapshot, path is: %s\n",path.c_str());
+	
 
 			thread s_thread(snapshot, sample_from, sample_to, path.c_str());
 			s_thread.detach();
 		}
 
-		else if(cmd_take_snaphot_series.compare(input_data[0]) == 0){
-			
-			//uint32_t sample_amount = stoull(input_data[1]);
-			//uint32_t snapshot_amount = stoull(input_data[2]);
+		else if(cmd_take_snapshot_series.compare(input_data[0]) == 0){
+
+			uint32_t snapshot_bytes = stoull(input_data[1]);
+			uint32_t snapshot_amount = stoull(input_data[2]);
 			string path = input_data[3];
 
-			printf("taking snapshot series, to path: %s\n", path.c_str());
-		
-		
+			if (snapshot_bytes > Utility::SNAPSHOT_MAX_BYTE_SIZE){
+				printf("snapshot size too large, maximum is %i ; aborting\n", Utility::SNAPSHOT_MAX_BYTE_SIZE);
+
+			} else if(_serial_snapshotting){
+				printf("the serial snapshotter is already running; arborting\n");
+			}
+			else if(!_recording)	{
+				printf("system is not recording; aborting\n");
+			}
+			else{
+				Utility::SNAPSHOT_BLOCK_SIZE = snapshot_bytes/4096;
+				Utility::SNAPSHOT_BYTE_SIZE = (snapshot_bytes/4096) * 4096;
+
+				printf("starting serial snapshot thread, to path: %s\n", path.c_str());		
+				thread s_thread(serial_snapshot, snapshot_amount ,path.c_str());
+				s_thread.detach();
+
+			}
+		}
+		else if(cmd_stop_snapshot_series.compare(input_data[0]) == 0){
+				_serial_snapshotting = false;
+
 		}
 
 		else if(cmd_exit.compare(input_data[0]) == 0){
@@ -202,15 +231,22 @@ int main(int argc, char *argv[]){
 	printf("exiting \n");
 }
 
-
+/**
+* Takes a series of sequencial snapshots from the circular buffer, between 
+	snapshots it waits for a signal from the Recorder that signals 
+	whenever a data for a snapshot is ready.
+	@param arg_snapshot_amount amounts of snap shots.
+	@param arg_path the path the snapshots will be written to.
+*/
 void serial_snapshot(uint32_t arg_snapshot_amount, const char arg_path[]){
 
 	std::unique_lock<std::mutex> lk(Utility::LM);
 	char path[sizeof(arg_path)+4];
 	int i = 0;
 	char* buffer_ptr;
-	uint32_t byte_size = (arg_snapshot_amount * sizeof(Sample));
-
+	uint32_t byte_size = Utility::SNAPSHOT_BYTE_SIZE;
+	uint32_t samples_pr_snapshot = Utility::SNAPSHOT_BYTE_SIZE / sizeof(Sample);
+	
 	_serial_snapshotting = true;
 
 	while(_serial_snapshotting == true){
@@ -220,7 +256,7 @@ void serial_snapshot(uint32_t arg_snapshot_amount, const char arg_path[]){
 		sprintf(path, "%s_%03d", arg_path, i);
 		printf("Writing snapshot %s", path);
 		//write the snapshot:
-		buffer_ptr = _c_buffer.get_Sample(Utility::ACTIVE_SAMPLE - arg_snapshot_amount);
+		buffer_ptr = _c_buffer.get_Sample( Utility::ACTIVE_SAMPLE -  samples_pr_snapshot);
 
 		FILE *s_file;
 		s_file = fopen(arg_path,"wb");

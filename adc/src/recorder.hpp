@@ -111,18 +111,22 @@ class Recorder{
 
 			Utility::WRITTEN_BLOCK = 0;
 			Utility::ACTIVE_SAMPLE = 0;
+			uint64_t active_sample = 0;
 			uint32_t tmp_block = 0;
 			int samples_pr_block = 4096/8;
 
 			while((ret = fread(write_address, 1, 4096,dux_fp)) >= 0){
+
 				write_address+=4096;
-				Utility::WRITTEN_BLOCK+=1;
-				tmp_block+=0;
-				Utility::ACTIVE_SAMPLE += samples_pr_block;
+				//Utility::WRITTEN_BLOCK+=1;
+				tmp_block+=1;
+				active_sample += samples_pr_block;
+				//Utility::ACTIVE_SAMPLE += samples_pr_block;
 
 				if(tmp_block >= Utility::SNAPSHOT_BLOCK_SIZE){
 					tmp_block = 0;
-					Utility::CV.notify_one();				
+					Utility::ACTIVE_SAMPLE = active_sample;
+					Utility::CV.notify_one();
 				}
 
 				if(write_address == arg_end_address){
