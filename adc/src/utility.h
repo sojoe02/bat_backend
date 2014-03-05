@@ -20,6 +20,7 @@ class Utility{
 
 		static std::condition_variable CV;
 		static std::mutex LM;
+		static bool SNAP_READY;
 
 };
 

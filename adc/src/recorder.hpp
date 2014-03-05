@@ -125,20 +125,23 @@ class Recorder{
 				tmp_block += 1;
 
 				active_sample += samples_pr_block;
+				Utility::LAST_SAMPLE +=samples_pr_block;
 
 				if(tmp_block >= Utility::SNAPSHOT_BLOCK_SIZE){
+					printf("signalling serial snapshotter\n");
 					tmp_block = 0;
 					Utility::SNAP_SAMPLE = active_sample;
+					Utility::SNAP_READY = true;
 					Utility::CV.notify_one();
 				}
 
 				if(write_address == arg_end_address){
-					
-					Utility::LAST_SAMPLE = active_sample;
-
 					write_address -= arg_buffer_size;
 					printf("resetting to beginning of buffer\n");
 				}
+
+				if(_stop == true)
+					break;
 			}
 
 			if(ret < 0)
