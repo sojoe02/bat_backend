@@ -125,7 +125,7 @@ class Recorder{
 				tmp_block += 1;
 
 				active_sample += samples_pr_block;
-				Utility::LAST_SAMPLE +=samples_pr_block;
+				Utility::LAST_SAMPLE += samples_pr_block;
 
 				if(tmp_block >= Utility::SNAPSHOT_BLOCK_SIZE){
 					printf("signalling serial snapshotter\n");
