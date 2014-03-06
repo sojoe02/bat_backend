@@ -236,21 +236,21 @@ int main(int argc, char *argv[]){
 		}
 		else if(cmd_take_snapshot_series_simple.compare(input_data[0]) == 0){
 
-			uint32_t sample_length = 120e6;
-			Utility::SNAPSHOT_BLOCK_SIZE = sample_length/4096;
-			Utility::SNAPSHOT_BYTE_SIZE = sample_length * sizeof(Sample);
+			uint32_t sample_length = 120e6/sizeof(Sample);
+			Utility::SNAPSHOT_BLOCK_SIZE = (sample_length*sizeof(Sample))/4096;
+			Utility::SNAPSHOT_BYTE_SIZE = sample_length*sizeof(Sample);
 			std::string path = "simple_shot";
 			uint64_t sample_number = Utility::LAST_SAMPLE;
 
 			printf("starting simple snapshot series thread0");
-			_serial_thread = new thread(serial_snapshot, sample_number, sample_length, 2, path.c_str());
 
+			_serial_thread = new thread(serial_snapshot, sample_number, sample_length, 2, path.c_str());
 
 		}
 
 		else if(cmd_stop_snapshot_series.compare(input_data[0]) == 0){
 			_serial_snapshotting = false;
-			if(_serial_thread != NULL)
+			if(_serial_thread != NULL && _serial_thread->joinable())
 				_serial_thread->join();	
 
 		}
@@ -261,9 +261,9 @@ int main(int argc, char *argv[]){
 				stop_recording();
 				_serial_snapshotting = false;
 				sleep(1);
-				if(_record_thread != NULL)
+				if(_record_thread != NULL && _record_thread->joinable())
 					_record_thread->join();
-				if(_serial_thread != NULL)
+				if(_serial_thread != NULL && _serial_thread->joinable())
 					_serial_thread->join();
 			}
 			break;			
@@ -302,8 +302,8 @@ void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uin
 
 	_serial_snapshotting = true;
 
-	uint32_t i = 0;
-	while( _serial_snapshotting == true && arg_count >= i-1 ){
+	uint32_t i = 1;
+	while( _serial_snapshotting == true && arg_count >= i ){
 
 		printf("waiting for condition variable to be set\n");
 
@@ -318,9 +318,10 @@ void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uin
 		buffer_ptr = _c_buffer.get_Sample( Utility::SNAP_SAMPLE -  samples_pr_snapshot);
 
 		FILE *s_file;
-		s_file = fopen(arg_path,"wb");
+		s_file = fopen(path,"wb");
 		fwrite(buffer_ptr, sizeof(char), byte_size, s_file);
-		fclose(s_file);	
+		fclose(s_file);
+		printf("Snapshot written\n");	
 		i++;
 
 	}
