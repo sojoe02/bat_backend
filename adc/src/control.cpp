@@ -34,6 +34,9 @@
 #include<algorithm>
 #include<iterator>
 #include<sstream>
+#include<ctime>
+#include<iostream>
+#include<fstream>
 
 //C11 threading:
 #include<atomic>
@@ -74,6 +77,7 @@ void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_p
 void start_recording(char arg_device[], uint32_t arg_sample_rate, 
 		char* arg_start_address, char* arg_end_address, int arg_buffer_size);
 void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uint32_t arg_count, const char arg_path[]);
+void write_error(const char arg_msg[], const char arg_path[]);
 
 bool _recording = false;
 std::atomic_bool _serial_snapshotting;
@@ -131,7 +135,10 @@ int main(int argc, char *argv[]){
 	printf("---------------------------------------------------\n");
 	//-----------------------------------------------------//
 
+	//setting file permission via umask:
 	umask(0);
+	//remove the pipe if it allready exists to get rid of potential
+	//'pipe garbage'
 	remove (filename);
 
 	printf("Creating Pipe; %s, Waiting for receiver process...\n\n", filename);
@@ -140,13 +147,11 @@ int main(int argc, char *argv[]){
 		perror("FIFO (named pipe) could not be created");
 		//exit(-1);
 	}
-
 	printf("---------------------------------------------------\n");
 
 	f_pipe = fopen(filename, "r");
 
 	while(1){
-
 
 		fgets(f_buffer, 1024, f_pipe);
 		input = f_buffer;
@@ -285,8 +290,10 @@ int main(int argc, char *argv[]){
  * Takes a series of sequencial snapshots from the circular buffer, between 
  snapshots it waits for a signal from the Recorder that signals 
  whenever a data for a snapshot is ready.
- @param arg_snapshot_amount amounts of snap shots.
+ @param arg_sample_number sample startpoint for the snapshot series.
  @param arg_path the path the snapshots will be written to.
+ @param arg_count amount of snapshots that will be written.
+ @param arg_sample_length number of samples each snapshot will contain.
  */
 void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uint32_t arg_count, const char arg_path[]){
 
@@ -378,4 +385,13 @@ void stop_recording(){
 	_recording = false;
 }
 
+void write_error(const char arg_msg[], const char arg_path[]){
+	char path[256];
+	//get the time:
+	std::time_t result = std::time(NULL);
 
+	sprintf(path, "error.%s.%X", arg_path, (uint32_t)result);
+	std::ofstream file(path);
+	file << arg_msg;
+	file.close();	
+}
