@@ -44,10 +44,23 @@ class Recorder{
 
 		Recorder():
 			_sample_rate(0), _channel_amount(0),_stop(false){
-				
+
 			}
 
-
+		/**
+		 * Start the the ADC sampling, unless the external trigger command
+		 * is set it will begin sampling as soon as the usbdux device has been
+		 * initialized.
+		 * The final three arguments are very important to get right
+		 * as the recorder thread will use them to determine where to write it's samples and
+		 * when it's reached end of the buffer. It doesn't care about the c_buffer class
+		 * at all.
+		 * @param arg_device name of the comedi device e.g., 'comedi0'
+		 * @param arg_sample_rate the rate the usb_dux should sample with in hertz (max=3[Mhz]})
+		 * @param arg_start_address the start address of the circle buffer sample should be loading into
+		 * @param arg_end_address the end address of the cicle buffer.
+		 * @param arg_buffer_size byte size of the buffer.
+		 */
 		int start_Sampling(char* arg_device, uint32_t arg_sample_rate, 
 				char* arg_start_address, char* arg_end_address, int arg_buffer_size){
 
@@ -93,6 +106,11 @@ class Recorder{
 			cmd->stop_src	= TRIG_NONE;
 			cmd->stop_arg	= 0;
 			cmd->convert_arg = convert_arg;
+		
+			//setup the sampling to start from the trigger.
+			//cmd->start_src = TRIG_EXT 
+			//cmd->start_arg = 1;
+
 
 			/* call test twice because different things are tested?
 			 * if tests are successful run sampling command */
@@ -150,7 +168,12 @@ class Recorder{
 			comedi_cancel(_device, 0);
 			return 0;
 		}
-
+		
+		/**
+		 * Stops the sampling and released the device, in a threadsafe manner
+		 * very important to stop the sampling upon program exit or nasty 
+		 * usbdux things will happen.
+		 */
 		void stop_Sampling(){
 			_stop = true;
 		}

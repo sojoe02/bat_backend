@@ -18,6 +18,7 @@
  *
  *         Author:  Soeren V. Joergensen, svjo@mmmi.sdu.dk
  *   Organization:  MMMI, University of Southern Denmark
+ *		  Version:	0.7
  *
  * =====================================================================================
  */
@@ -96,10 +97,16 @@ struct Sample{
 C_Buffer<Sample> _c_buffer(BUFFER_SIZE);
 Recorder<Sample> _recorder;
 
+/**
+ * Initializes the command structure of the program.
+ * It's simple string matching, strings are read from a named pipe
+ * in the users homedir e.g., commands can be given via cat > <pipe> in
+ * regular bash.
+ */ 
 int main(int argc, char *argv[]){
 
 	_serial_snapshotting = false;
-	Utility::SNAPSHOT_BLOCK_SIZE = (uint32_t)152e6/4096;
+	Utility::SNAPSHOT_BLOCK_SIZE = Utility::SNAPSHOT_BYTE_SIZE/4096;
 
 	//open the cmd pipe:
 	FILE* f_pipe;
@@ -157,7 +164,7 @@ int main(int argc, char *argv[]){
 		input = f_buffer;
 		printf("input is %s\n", input.c_str());
 
-		//Split the input string up and put comman and it's arguments in a vector:		
+		//Split the input string up and put command and it's arguments in a vector:		
 		istringstream iss(input);
 		vector<string> input_data{istream_iterator<string>{iss},
 			istream_iterator<string>{}};
@@ -288,12 +295,12 @@ int main(int argc, char *argv[]){
 
 /**
  * Takes a series of sequencial snapshots from the circular buffer, between 
- snapshots it waits for a signal from the Recorder that signals 
- whenever a data for a snapshot is ready.
- @param arg_sample_number sample startpoint for the snapshot series.
- @param arg_path the path the snapshots will be written to.
- @param arg_count amount of snapshots that will be written.
- @param arg_sample_length number of samples each snapshot will contain.
+ * snapshots it waits for a signal from the Recorder that signals 
+ * whenever a data for a snapshot is ready.
+ * @param arg_sample_number sample startpoint for the snapshot series.
+ * @param arg_path the path the snapshots will be written to.
+ * @param arg_count amount of snapshots that will be written.
+ * @param arg_sample_length number of samples each snapshot will contain.
  */
 void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uint32_t arg_count, const char arg_path[]){
 
@@ -302,7 +309,6 @@ void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uin
 	std::unique_lock<std::mutex> lk(Utility::LM);
 
 	char path[1024];
-
 	char* buffer_ptr;
 	uint32_t byte_size = Utility::SNAPSHOT_BYTE_SIZE;
 	uint32_t samples_pr_snapshot = Utility::SNAPSHOT_BYTE_SIZE / sizeof(Sample);
@@ -310,6 +316,7 @@ void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uin
 	_serial_snapshotting = true;
 
 	uint32_t i = 1;
+	//starting the snapshot loop, which is controlled by the recorder thread.
 	while( _serial_snapshotting == true && arg_count >= i ){
 
 		printf("waiting for condition variable to be set\n");
@@ -337,6 +344,14 @@ void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uin
 
 }
 
+/**
+ * Takes a single snapshot, unlike the serial snapshotter, this does not need an overhead
+ * as it will copy the buffer area neeed to another location in memory
+ * and then writing those to a binary file. 
+ * @param arg_sample_from start sample of the snapshot.
+ * @param arg_sample_to end sample of the snapshot.
+ * @param arg_path[] path of the snapshot.
+ */
 void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]){
 	//get rid of ekstra bytes:
 	//and ensure that one whole samples are saved:
@@ -368,7 +383,20 @@ void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_p
 	munmap(snapshot_space,byte_size);
 }
 
-
+/**
+ * Start the the ADC sampling thread, unless the external trigger command
+ * is set it will begin sampling as soon as the usbdux device has been
+ * initialized.
+ * The final three arguments are very important to get right
+ * as the recorder thread will use them to determine where to write it's samples and
+ * when it's reached end of the buffer. It doesn't care about the c_buffer class
+ * at all.
+ * @param arg_device name of the comedi device e.g., 'comedi0'
+ * @param arg_sample_rate the rate the usb_dux should sample with in hertz (max=3[Mhz]})
+ * @param arg_start_address the start address of the circle buffer sample should be loading into
+ * @param arg_end_address the end address of the cicle buffer.
+ * @param arg_buffer_size byte size of the buffer.
+ */
 void start_recording(char arg_device[], uint32_t arg_sample_rate, 
 		char* arg_start_address, char* arg_end_address, int arg_buffer_size){
 
@@ -379,18 +407,28 @@ void start_recording(char arg_device[], uint32_t arg_sample_rate,
 
 }
 
+/**
+ * Stops the recording, this function needs to be called when exiting this program
+ * unless you want kernel problems.
+ */
 void stop_recording(){
 	_recorder.stop_Sampling();
 
 	_recording = false;
 }
 
+
+/**
+ * Writes an error text erro file to disk, filename is <path>.<data(HEX)>.
+ * @param arg_msg the message that the error file should contain.
+ * @param arg_path the path the file will be written to.
+ */
 void write_error(const char arg_msg[], const char arg_path[]){
 	char path[256];
 	//get the time:
 	std::time_t result = std::time(NULL);
 
-	sprintf(path, "error.%s.%X", arg_path, (uint32_t)result);
+	sprintf(path, "%s.error.%X", arg_path, (uint32_t)result);
 	std::ofstream file(path);
 	file << arg_msg;
 	file.close();	

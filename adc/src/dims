@@ -6,9 +6,6 @@
 #include <atomic>
 
 class Utility{
-	/**
-	 * Static class that offers various shared variables.
-	 */
 	public:	
 		static uint64_t WRITTEN_SAMPLE;
 

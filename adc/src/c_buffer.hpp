@@ -36,8 +36,16 @@ class C_Buffer{
 
 	public:
 
-		C_Buffer(uint32_t arg_byte_size)
-		:_write_offset(0),_read_offset(0)
+		/**
+		 * Initializes a circlular buffer in dev/shm that is designed to 
+		 * handle data written to it using the kernel for optimial handling
+		 * of read and write performance. 
+		 * Regarding the template; it the current implementation 
+		 * the byte size of the Type has to be a multiple of 4096.
+		 * @param arg_byte_size byte size of the buffer (will be rounded down to next
+		 * legal system page size).
+		 */
+		C_Buffer(uint32_t arg_byte_size):_write_offset(0),_read_offset(0)
 		{
 			//path = "dev/zero";
 			int file_descriptor;
@@ -64,7 +72,13 @@ class C_Buffer{
 
 			printf("%i bytes, will be allocated\n", _byte_size);
 
-			printf("total amount of samples available %f\n", (double)_byte_size/(double)sizeof(Type));
+			//checking if Type is a multiple of 4096:
+			if ( _byte_size % sizeof(Type) != 0)
+				errx(1, "Type is not a multiple of system pagesize(4096)");
+			
+			
+
+			//printf("total amount of samples available %f\n", (double)_byte_size/(double)sizeof(Type));
 			_sample_amount = uint64_t(_byte_size/sizeof(Type));
 
 			_status = ftruncate(file_descriptor, _byte_size);
@@ -99,6 +113,11 @@ class C_Buffer{
 				errx(1, "cannot close file!");
 		}
 
+		
+		/**
+		 * Will unlink and unmap the circle buffer, leaving the kernel to do
+		 * the cleaning up.
+		 */
 		~C_Buffer(){
 			_status = unlink(_path.c_str());
 			if(_status)
@@ -109,7 +128,15 @@ class C_Buffer{
 				errx(1, "unable to delete memory mapping");
 		}
 
-
+		/**
+		 * Will return a pointer the sample number that's requested
+		 * it will calculate the sample pointer logically based on sample size
+		 * and argument. It doesn't care whether the requested sample is actually
+		 * there or not, that's up to the user to check!
+		 * @param arg_sample_number the sample number 
+		 * the user wants to retrieve a pointer to
+		 * @returns pointer to the calculated sample.
+		 */
 		char* get_Sample(uint64_t arg_sample_number){
 			//calculate index:
 			uint64_t index = arg_sample_number;
@@ -122,15 +149,27 @@ class C_Buffer{
 
 			return _address + (index * sizeof(Type));
 		}
-
+		
+		/**
+		 * For retrieval of the start address of the buffer. 
+		 * @returns char pointer to the beginning of the buffer.
+		 */
 		char* get_Start_Address(){
 			return _start_address;			
 		}
 
+		/**
+		 * For retrieval of the end address of the buffer. 
+		 * @returns a char pointer pointing to the end of the buffer.
+		 */ 
 		char* get_End_Address(){
 			return _end_address;
 		}
 
+		/**
+		 * For getting the size of the buffer 
+		 * @returns the actual byte size of the buffer.
+		 */
 		uint32_t get_Buffer_Size(){
 			return _byte_size;
 		}
