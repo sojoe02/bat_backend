@@ -115,7 +115,7 @@ int main(int argc, char *argv[]){
 	//open the cmd pipe:
 	FILE* f_pipe;
 	char f_buffer[1024];
-	char filename[] = "/home/pi/grapper.cmd";
+	std::string filename = "/home/pi/grapper.cmd";
 	char device[] = "/dev/comedi0";
 
 	printf("---------------------------------------------------\n");
@@ -137,30 +137,34 @@ int main(int argc, char *argv[]){
 	printf("---------------------------------------------------\n");
 	printf("CMDs available are \n");
 	printf("---------------------------------------------------\n");
-	printf("'exit'\t\t (exits the grapper)\n");
-	printf("'start_rec <sample_rate>'\t (starts the recorder module)\n");
-	printf("'stop_rec'\t\t (stops the recorder module)\n");
+	printf("'exit'\n");
+	printf("'start_rec <sample_rate>'\n");
+	printf("'stop_rec'\n");
 	printf("'snapshot <sample_from,64uint> <sample_to,64uint> <path,string>'\n");
-	printf("'serial_snapshot <byte_size,int> <path,string>'\n");
+	printf("'serial_snapshot <start_sample,64uint> <sample_length,32uint> <count,uint32> <path,string>'");
+	printf("'simple_serial <count,uint32>'\n");
 	printf("'serial_stop \n'");
 	printf("---------------------------------------------------\n");
 	//-----------------------------------------------------//
 
+	if(argc != 2){
+		printf("no command pipe path given, using default path\n");
+	} else
+		filename = argv[1];
+
 	//setting file permission via umask:
 	umask(0);
-	//remove the pipe if it allready exists to get rid of potential
-	//'pipe garbage'
-	remove (filename);
+	//remove the pipe if it allready exists to get rid of potential 'pipe garbage'
+	remove (filename.c_str());
 
-	printf("Creating Pipe; %s, Waiting for receiver process...\n\n", filename);
+	printf("Creating Pipe; %s, Waiting for receiver process...\n\n", filename.c_str());
 	//TRY TO CRATE A NAMED PIPE
-	if (mkfifo(filename,0666)<0){
+	if (mkfifo(filename.c_str(),0666)<0){
 		perror("FIFO (named pipe) could not be created");
 		//exit(-1);
 	}
 	printf("---------------------------------------------------\n");
-
-	f_pipe = fopen(filename, "r");
+	f_pipe = fopen(filename.c_str(), "r");
 
 	while(1){
 
@@ -174,8 +178,13 @@ int main(int argc, char *argv[]){
 			istream_iterator<string>{}};
 
 		if(cmd_start_rec.compare(input_data[0]) == 0){
+
+			char buffer[512];
+
 			if(_recording){
-				printf("System is recording, you need to stop ('stop_rec') it to restart it\n");
+				sprintf(buffer,"System is recording, you need to stop ('stop_rec') it to restart it\n");
+				printf(buffer);
+				write_error("general",buffer);
 
 			}else{
 				printf("Starting recording at %u[Hz]\n", _sample_rate);
@@ -185,17 +194,19 @@ int main(int argc, char *argv[]){
 						_c_buffer.get_End_Address(), _c_buffer.get_Buffer_Size());
 			}
 		}
-
 		else if(cmd_set_sr.compare(input_data[0])==0){
+
+			char buffer[512];
+
 			if(!_recording && input_data.size() >= 2){
 				_sample_rate = stoi(input_data[1]);
 				printf("Sample rate set to %u[hz]",_sample_rate);
 			}else{
-				printf("Not enough arguments, to adjust samplerate");
-				printf("or system is recording!\n");
+				sprintf(buffer,"Not enough arguments, to adjust samplerate or system is recording!\n");
+				printf(buffer);
+				write_error("general", buffer);
 			}
 		}
-
 		else if(cmd_stop_rec.compare(input_data[0]) == 0){
 			if(!_recording){
 				printf("System is not recording, no need to stop it\n");			
@@ -203,11 +214,18 @@ int main(int argc, char *argv[]){
 				printf("Stopping recording now\n");
 				stop_recording();	
 				_record_thread->join();	
-				//sleep(1);			
 			}
 		}
-
 		else if(cmd_take_snapshot.compare(input_data[0]) == 0){
+
+			char buffer[256];
+
+			if(input_data.size() != 4){
+				sprintf(buffer,"Not enough arguments to take single snapshot\n");
+				printf(buffer);
+				write_error("general", buffer);
+			}
+
 			uint64_t sample_from = stoull(input_data[1]);
 			uint64_t sample_to = stoull(input_data[2]);
 			string path = input_data[3];
@@ -217,8 +235,14 @@ int main(int argc, char *argv[]){
 			thread s_thread(snapshot, sample_from, sample_to, path.c_str());
 			s_thread.detach();
 		}
-
 		else if(cmd_take_snapshot_series.compare(input_data[0]) == 0){
+
+			char buffer[512];
+
+			if(input_data.size() !=  6){
+				sprintf(buffer, "too few or many arguments for taking snapshot series ");
+				write_error("arg",buffer);			
+			}
 
 			uint64_t sample_number = stoull(input_data[1]);
 			uint32_t sample_length = stoull(input_data[2]);
@@ -228,27 +252,44 @@ int main(int argc, char *argv[]){
 			printf("taking snapshots in sequence\n");
 
 			if (sample_length * sizeof(Sample) > Utility::SNAPSHOT_MAX_BYTE_SIZE){
-				printf("snapshot size too large, maximum is %i ; aborting\n", Utility::SNAPSHOT_MAX_BYTE_SIZE);
-
-			} else if(_serial_snapshotting){
-				printf("the serial snapshotter is already running; arborting\n");
+				sprintf(buffer, "snapshopt size too large, maximum is %i; aborting\n", Utility::SNAPSHOT_MAX_BYTE_SIZE);
+				printf("%s",buffer);
+				write_error(path.c_str(), buffer);					
+			} 
+			else if(_serial_snapshotting){
+				sprintf(buffer,"the serial snapshotter is already running; arborting\n");
+				printf("%s", buffer);
+				write_error(path.c_str(), buffer);				
 			}
-			else if(!_recording)	{
-				printf("system is not recording; aborting\n");
+			else if(!_recording){
+				sprintf(buffer,"system is not recording; aborting\n");
+				printf("%s", buffer);
+				write_error(path.c_str(), buffer);
 			} 
 			else if(sample_number < (Utility::LAST_SAMPLE - sample_length)){
-				printf("the sample you want is obsolete\n");
+				sprintf(buffer,"the sample you want is obsolete\n");
+				printf("%s",buffer);
+				write_error(path.c_str(), buffer);
 			}
 			else{
 				Utility::SNAPSHOT_BLOCK_SIZE = sample_length/4096;
 				Utility::SNAPSHOT_BYTE_SIZE = sample_length * sizeof(Sample);
 
 				printf("starting snapshot series thread, to path: %s\n", path.c_str());		
+				//start the serial snapshotter thread:
 				_serial_thread = new thread(serial_snapshot, sample_number , sample_length, count, path.c_str());
 			}
 		}
 		else if(cmd_take_snapshot_series_simple.compare(input_data[0]) == 0){
 
+			char buffer[512];
+
+			if(input_data.size() !=  2){
+				sprintf(buffer, "too few or many arguments for taking simple snapshot series ");
+				write_error("arg",buffer);			
+			}
+
+			uint32_t count = stoull(input_data[1]);
 			uint32_t sample_length = 120e6/sizeof(Sample);
 			Utility::SNAPSHOT_BLOCK_SIZE = (sample_length*sizeof(Sample))/4096;
 			Utility::SNAPSHOT_BYTE_SIZE = sample_length*sizeof(Sample);
@@ -256,20 +297,17 @@ int main(int argc, char *argv[]){
 			uint64_t sample_number = Utility::LAST_SAMPLE;
 
 			printf("starting simple snapshot series thread0");
-
-			_serial_thread = new thread(serial_snapshot, sample_number, sample_length, 2, path.c_str());
-
+			//start the serial snappshotter thread:
+			_serial_thread = new thread(serial_snapshot, sample_number, sample_length, count, path.c_str());
 		}
-
 		else if(cmd_stop_snapshot_series.compare(input_data[0]) == 0){
 			_serial_snapshotting = false;
 			stop_serial_snapshot();
 
 			if(_serial_thread != NULL && _serial_thread->joinable())
-				_serial_thread->join();	
+				_serial_thread->join();
 
 		}
-
 		else if(cmd_exit.compare(input_data[0]) == 0){
 			if(_recording){
 				printf("stopping recording\n");
@@ -283,11 +321,12 @@ int main(int argc, char *argv[]){
 			}
 			break;			
 
-		}else
+		}
+		else
 			printf("Command '%s' unknown\n", input.c_str());
 
 	}
-	if (unlink(filename)<0){
+	if (unlink(filename.c_str())<0){
 		perror("Error deleting pipe file.");
 		exit(-1);
 	}
@@ -325,7 +364,7 @@ void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uin
 
 		Utility::CV.wait(lk,[]{return Utility::SNAP_READY;});
 		Utility::SNAP_READY = false;
-		
+
 		if(_stop_serial_snap){
 			break;
 			printf("stopping serial snapshotting\n");
@@ -349,7 +388,7 @@ void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uin
 	}
 	lk.unlock();
 	_serial_snapshotting == false;
-	
+
 
 }
 
