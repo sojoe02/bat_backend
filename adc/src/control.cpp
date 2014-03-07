@@ -18,7 +18,7 @@
  *
  *         Author:  Soeren V. Joergensen, svjo@mmmi.sdu.dk
  *   Organization:  MMMI, University of Southern Denmark
- *		  Version:	0.7
+ *		  Version:	0.71
  *
  * =====================================================================================
  */
@@ -68,20 +68,22 @@ std::condition_variable Utility::CV;
 std::mutex Utility::LM;
 
 bool Utility::SNAP_READY = false;
+//----------------------------------------------------//
 
-//-----------INFORMATION------------------------------//
-
-uint32_t _sample_rate = (uint32_t)30e5;
-
+//-----------Function-Headers-------------------------//
 void stop_recording();
 void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]);
 void start_recording(char arg_device[], uint32_t arg_sample_rate, 
 		char* arg_start_address, char* arg_end_address, int arg_buffer_size);
 void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uint32_t arg_count, const char arg_path[]);
+void stop_serial_snapshot();
 void write_error(const char arg_msg[], const char arg_path[]);
 
+//-----------Variables:-------------------------------//
+uint32_t _sample_rate = (uint32_t)30e5;
 bool _recording = false;
 std::atomic_bool _serial_snapshotting;
+std::atomic_bool _stop_serial_snap;
 bool _snap_wait = false;
 //status integer:
 int ret = 0;
@@ -106,6 +108,8 @@ Recorder<Sample> _recorder;
 int main(int argc, char *argv[]){
 
 	_serial_snapshotting = false;
+	_stop_serial_snap = false;
+
 	Utility::SNAPSHOT_BLOCK_SIZE = Utility::SNAPSHOT_BYTE_SIZE/4096;
 
 	//open the cmd pipe:
@@ -169,7 +173,6 @@ int main(int argc, char *argv[]){
 		vector<string> input_data{istream_iterator<string>{iss},
 			istream_iterator<string>{}};
 
-
 		if(cmd_start_rec.compare(input_data[0]) == 0){
 			if(_recording){
 				printf("System is recording, you need to stop ('stop_rec') it to restart it\n");
@@ -217,10 +220,9 @@ int main(int argc, char *argv[]){
 
 		else if(cmd_take_snapshot_series.compare(input_data[0]) == 0){
 
-			uint32_t sample_number = stoull(input_data[1]);
+			uint64_t sample_number = stoull(input_data[1]);
 			uint32_t sample_length = stoull(input_data[2]);
 			uint32_t count = stoull(input_data[3]);
-
 			string path = input_data[4];			
 
 			printf("taking snapshots in sequence\n");
@@ -243,7 +245,6 @@ int main(int argc, char *argv[]){
 
 				printf("starting snapshot series thread, to path: %s\n", path.c_str());		
 				_serial_thread = new thread(serial_snapshot, sample_number , sample_length, count, path.c_str());
-
 			}
 		}
 		else if(cmd_take_snapshot_series_simple.compare(input_data[0]) == 0){
@@ -262,6 +263,8 @@ int main(int argc, char *argv[]){
 
 		else if(cmd_stop_snapshot_series.compare(input_data[0]) == 0){
 			_serial_snapshotting = false;
+			stop_serial_snapshot();
+
 			if(_serial_thread != NULL && _serial_thread->joinable())
 				_serial_thread->join();	
 
@@ -305,7 +308,6 @@ int main(int argc, char *argv[]){
 void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uint32_t arg_count, const char arg_path[]){
 
 	printf("starting simple snapshotter\n");
-
 	std::unique_lock<std::mutex> lk(Utility::LM);
 
 	char path[1024];
@@ -323,8 +325,14 @@ void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uin
 
 		Utility::CV.wait(lk,[]{return Utility::SNAP_READY;});
 		Utility::SNAP_READY = false;
-		//generate the path:
+		
+		if(_stop_serial_snap){
+			break;
+			printf("stopping serial snapshotting\n");
+			_stop_serial_snap = false;
+		}
 
+		//generate the path:
 		sprintf(path, "%s.%llX.%u", arg_path, (uint64_t)Utility::SNAP_SAMPLE, i);
 
 		printf("Writing snapshot %s\n", path);
@@ -341,7 +349,16 @@ void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uin
 	}
 	lk.unlock();
 	_serial_snapshotting == false;
+	
 
+}
+
+/**
+ * Stop the serial snapshotting thread in a safely.
+ */
+void stop_serial_snapshot(){
+	_stop_serial_snap = true;
+	Utility::CV.notify_one();
 }
 
 /**
@@ -355,9 +372,7 @@ void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uin
 void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]){
 	//get rid of ekstra bytes:
 	//and ensure that one whole samples are saved:
-
-	uint32_t byte_size = (arg_sample_to - arg_sample_from)*(sizeof(Sample)) ; 
-
+	uint32_t byte_size = (arg_sample_to - arg_sample_from)*(sizeof(Sample)) ;
 
 	char *snapshot_space;
 	char *buffer_ptr;
