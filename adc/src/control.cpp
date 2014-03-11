@@ -18,7 +18,7 @@
  *
  *         Author:  Soeren V. Joergensen, svjo@mmmi.sdu.dk
  *   Organization:  MMMI, University of Southern Denmark
- *		  Version:	0.71
+ *		  Version:	0.8
  *
  * =====================================================================================
  */
@@ -157,7 +157,7 @@ int main(int argc, char *argv[]){
 	//remove the pipe if it allready exists to get rid of potential 'pipe garbage'
 	remove (filename.c_str());
 
-	printf("Creating Pipe; %s, Waiting for receiver process...\n\n", filename.c_str());
+	printf("creating Pipe; %s, Waiting for receiver process...\n\n", filename.c_str());
 	//TRY TO CRATE A NAMED PIPE
 	if (mkfifo(filename.c_str(),0666)<0){
 		perror("FIFO (named pipe) could not be created");
@@ -183,8 +183,7 @@ int main(int argc, char *argv[]){
 
 			if(_recording){
 				sprintf(buffer,"System is recording, you need to stop ('stop_rec') it to restart it\n");
-				printf(buffer);
-				write_error("general",buffer);
+				warnx(buffer);
 
 			}else{
 				printf("Starting recording at %u[Hz]\n", _sample_rate);
@@ -199,12 +198,24 @@ int main(int argc, char *argv[]){
 			char buffer[512];
 
 			if(!_recording && input_data.size() >= 2){
-				_sample_rate = stoi(input_data[1]);
-				printf("Sample rate set to %u[hz]",_sample_rate);
+				try{
+					int sample_rate = stoi(input_data[1]);
+					if(sample_rate >= 1 && sample_rate <=30000000){
+						_sample_rate = sample_rate;					
+						printf("Sample rate set to %u[hz]",_sample_rate);
+					} else 
+						warnx("Argument for setting sample_rate out of range(1-30000000))");
+
+				} catch(const std::invalid_argument& ia){
+					warnx("Invalid argument type for setting sample rate");
+
+				} catch(const std::out_of_range& ia){
+					warnx("Out of range value given as argument for sample rate");
+				}
+
 			}else{
 				sprintf(buffer,"Not enough arguments, to adjust samplerate or system is recording!\n");
-				printf(buffer);
-				write_error("general", buffer);
+				warnx(buffer);
 			}
 		}
 		else if(cmd_stop_rec.compare(input_data[0]) == 0){
@@ -221,19 +232,20 @@ int main(int argc, char *argv[]){
 			char buffer[256];
 
 			if(input_data.size() != 4){
-				sprintf(buffer,"Not enough arguments to take single snapshot\n");
-				printf(buffer);
+				sprintf(buffer,"Not enough arguments to take single snapshot");
+				warnx(buffer);
 				write_error("general", buffer);
+			} else{
+
+				uint64_t sample_from = stoull(input_data[1]);
+				uint64_t sample_to = stoull(input_data[2]);
+				string path = input_data[3];
+
+				printf("taking snapshot, path is: %s\n",path.c_str());
+
+				thread s_thread(snapshot, sample_from, sample_to, path.c_str());
+				s_thread.detach();
 			}
-
-			uint64_t sample_from = stoull(input_data[1]);
-			uint64_t sample_to = stoull(input_data[2]);
-			string path = input_data[3];
-
-			printf("taking snapshot, path is: %s\n",path.c_str());
-
-			thread s_thread(snapshot, sample_from, sample_to, path.c_str());
-			s_thread.detach();
 		}
 		else if(cmd_take_snapshot_series.compare(input_data[0]) == 0){
 
@@ -242,42 +254,49 @@ int main(int argc, char *argv[]){
 			if(input_data.size() !=  6){
 				sprintf(buffer, "too few or many arguments for taking snapshot series ");
 				write_error("arg",buffer);			
-			}
+			} else{
 
-			uint64_t sample_number = stoull(input_data[1]);
-			uint32_t sample_length = stoull(input_data[2]);
-			uint32_t count = stoull(input_data[3]);
-			string path = input_data[4];			
+				try{
+					uint64_t sample_number = stoull(input_data[1]);
+					uint32_t sample_length = stoull(input_data[2]);
+					uint32_t count = stoull(input_data[3]);
+					string path = input_data[4];			
 
-			printf("taking snapshots in sequence\n");
+					printf("taking snapshots in sequence\n");
 
-			if (sample_length * sizeof(Sample) > Utility::SNAPSHOT_MAX_BYTE_SIZE){
-				sprintf(buffer, "snapshopt size too large, maximum is %i; aborting\n", Utility::SNAPSHOT_MAX_BYTE_SIZE);
-				printf("%s",buffer);
-				write_error(path.c_str(), buffer);					
-			} 
-			else if(_serial_snapshotting){
-				sprintf(buffer,"the serial snapshotter is already running; arborting\n");
-				printf("%s", buffer);
-				write_error(path.c_str(), buffer);				
-			}
-			else if(!_recording){
-				sprintf(buffer,"system is not recording; aborting\n");
-				printf("%s", buffer);
-				write_error(path.c_str(), buffer);
-			} 
-			else if(sample_number < (Utility::LAST_SAMPLE - sample_length)){
-				sprintf(buffer,"the sample you want is obsolete\n");
-				printf("%s",buffer);
-				write_error(path.c_str(), buffer);
-			}
-			else{
-				Utility::SNAPSHOT_BLOCK_SIZE = sample_length/4096;
-				Utility::SNAPSHOT_BYTE_SIZE = sample_length * sizeof(Sample);
+					if (sample_length * sizeof(Sample) > Utility::SNAPSHOT_MAX_BYTE_SIZE || sample_length < 1){
+						sprintf(buffer, "snapshot length out of range(1%i); aborting", Utility::SNAPSHOT_MAX_BYTE_SIZE);
+						warnx("%s",buffer);
+						write_error(path.c_str(), buffer);					
+					} 
+					else if(_serial_snapshotting){
+						sprintf(buffer,"the serial snapshotter is already running; arborting");
+						warnx("%s", buffer);
+						write_error(path.c_str(), buffer);				
+					}
+					else if(!_recording){
+						sprintf(buffer,"system is not recording; aborting");
+						warnx("%s", buffer);
+						write_error(path.c_str(), buffer);
+					} 
+					else if(sample_number < (Utility::LAST_SAMPLE - sample_length)){
+						sprintf(buffer,"the sample you want is obsolete");
+						warnx("%s",buffer);
+						write_error(path.c_str(), buffer);
+					}
+					else{
+						Utility::SNAPSHOT_BLOCK_SIZE = sample_length/4096;
+						Utility::SNAPSHOT_BYTE_SIZE = sample_length * sizeof(Sample);
 
-				printf("starting snapshot series thread, to path: %s\n", path.c_str());		
-				//start the serial snapshotter thread:
-				_serial_thread = new thread(serial_snapshot, sample_number , sample_length, count, path.c_str());
+						printf("starting snapshot series thread, to path: %s\n", path.c_str());		
+						//start the serial snapshotter thread:
+						_serial_thread = new thread(serial_snapshot, sample_number , sample_length, count, path.c_str());
+					}
+				}  catch(const std::invalid_argument& ia){
+					warn("Invalid argument type(s) for starting snapshot series");
+				}  catch(const std::out_of_range& ia){
+					warnx("Out of range value given as argument for count");
+				}
 			}
 		}
 		else if(cmd_take_snapshot_series_simple.compare(input_data[0]) == 0){
@@ -286,19 +305,25 @@ int main(int argc, char *argv[]){
 
 			if(input_data.size() !=  2){
 				sprintf(buffer, "too few or many arguments for taking simple snapshot series ");
-				write_error("arg",buffer);			
+				warnx(buffer);
+			}else{
+				try{
+				uint32_t count = stoull(input_data[1]);
+				uint32_t sample_length = 120e6/sizeof(Sample);
+				Utility::SNAPSHOT_BLOCK_SIZE = (sample_length*sizeof(Sample))/4096;
+				Utility::SNAPSHOT_BYTE_SIZE = sample_length*sizeof(Sample);
+				std::string path = "/mnt/simple_shot";
+				uint64_t sample_number = Utility::LAST_SAMPLE;
+
+				printf("starting simple snapshot series thread0");
+				//start the serial snappshotter thread:
+				_serial_thread = new thread(serial_snapshot, sample_number, sample_length, count, path.c_str());
+				}  catch(const std::invalid_argument& ia){
+					warnx("Invalid argument for starting snapshot series");
+				}  catch(const std::out_of_range& ia){
+					warnx("Out of range value given as argument for sample rate");
+				}
 			}
-
-			uint32_t count = stoull(input_data[1]);
-			uint32_t sample_length = 120e6/sizeof(Sample);
-			Utility::SNAPSHOT_BLOCK_SIZE = (sample_length*sizeof(Sample))/4096;
-			Utility::SNAPSHOT_BYTE_SIZE = sample_length*sizeof(Sample);
-			std::string path = "simple_shot";
-			uint64_t sample_number = Utility::LAST_SAMPLE;
-
-			printf("starting simple snapshot series thread0");
-			//start the serial snappshotter thread:
-			_serial_thread = new thread(serial_snapshot, sample_number, sample_length, count, path.c_str());
 		}
 		else if(cmd_stop_snapshot_series.compare(input_data[0]) == 0){
 			_serial_snapshotting = false;
@@ -401,9 +426,9 @@ void stop_serial_snapshot(){
 }
 
 /**
- * Takes a single snapshot, unlike the serial snapshotter, this does not need an overhead
- * as it will copy the buffer area neeed to another location in memory
- * and then writing those to a binary file. 
+ * Takes a single snapshot. Unlike the serial snapshotter this does not need 
+ * much of an overhead as it will copy the buffer area neeed to another 
+ * location in memory and then writing that area to a binary file. 
  * @param arg_sample_from start sample of the snapshot.
  * @param arg_sample_to end sample of the snapshot.
  * @param arg_path[] path of the snapshot.
@@ -422,8 +447,10 @@ void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_p
 	snapshot_space = (char*)mmap(NULL,byte_size, 
 			PROT_READ | PROT_WRITE, MAP_ANON|MAP_SHARED, -1, 0);
 
-	if(snapshot_space == MAP_FAILED)
-		errx(1,"snapshot allocation failed");
+	if(snapshot_space == MAP_FAILED){
+		warnx("snapshot allocation failed");
+		return;
+	}
 
 	//copy the snapshot data into the empty memmap:
 	memcpy(snapshot_space, buffer_ptr, byte_size);
@@ -477,7 +504,7 @@ void stop_recording(){
  * @param arg_msg the message that the error file should contain.
  * @param arg_path the path the file will be written to.
  */
-void write_error(const char arg_msg[], const char arg_path[]){
+void write_error(const char arg_path[], const char arg_msg[]){
 	char path[256];
 	//get the time:
 	std::time_t result = std::time(NULL);

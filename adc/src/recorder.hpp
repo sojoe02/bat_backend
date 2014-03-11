@@ -75,7 +75,7 @@ class Recorder{
 			_device = comedi_open(arg_device);
 
 
-			int buffer = 1048576*4;
+			int buffer = 1048576*40;
 			if(comedi_set_max_buffer_size(_device, 0, buffer) < 0 ){
 				printf("Failed to set max buffer size to %i bytes\n", buffer);
 				return -1;
