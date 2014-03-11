@@ -138,10 +138,11 @@ int main(int argc, char *argv[]){
 	printf("CMDs available are \n");
 	printf("---------------------------------------------------\n");
 	printf("'exit'\n");
-	printf("'start_rec <sample_rate>'\n");
+	printf("'start_rec'\n");
 	printf("'stop_rec'\n");
+	printf("'set_sr '<sample_rate(Hz), int>'\n");
 	printf("'snapshot <sample_from,64uint> <sample_to,64uint> <path,string>'\n");
-	printf("'serial_snapshot <start_sample,64uint> <sample_length,32uint> <count,uint32> <path,string>'");
+	printf("'serial_snapshot <start_sample,64uint> <sample_length,32uint> <count,uint32> <path,string>'\n");
 	printf("'simple_serial <count,uint32>'\n");
 	printf("'serial_stop \n'");
 	printf("---------------------------------------------------\n");
