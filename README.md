@@ -12,14 +12,14 @@ A data grapper(C++), that graps data from a USBDUX device, and places it in a ci
 
 #TESTING RESULTS:
 
-ADC soak test 1:
+##ADC soak test 1:
 
-##Parameters:
+###Parameters:
 
 	18[hours] continous 3[Mhz] sampling.
 	5.30[hour.min] contigous 20[s] snapshots to external 3.5" drive (900Gb).
 	
-##Result:
+###Result:
 
 	Pass
 
