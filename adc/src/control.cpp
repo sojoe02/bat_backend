@@ -162,7 +162,7 @@ int main(int argc, char *argv[]){
 	//TRY TO CRATE A NAMED PIPE
 	if (mkfifo(filename.c_str(),0666)<0){
 		perror("FIFO (named pipe) could not be created");
-		//exit(-1);
+		exit(-1);
 	}
 	printf("---------------------------------------------------\n");
 	f_pipe = fopen(filename.c_str(), "r");
@@ -221,7 +221,7 @@ int main(int argc, char *argv[]){
 		}
 		else if(cmd_stop_rec.compare(input_data[0]) == 0){
 			if(!_recording){
-				printf("System is not recording, no need to stop it\n");			
+				warnx("System is not recording, no need to stop it\n");			
 			}else{
 				printf("Stopping recording now\n");
 				stop_recording();	
