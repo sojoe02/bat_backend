@@ -12,6 +12,14 @@ A data grapper(C++), that graps data from a USBDUX device, and places it in a ci
 
 #PART 1:
 
+##NOTES:
+
+###Rasberry Pi:
+* External 2.5" drive need external power supply - needs to be tested more thoroughly.
+* The Pi can't allways boot with external drive attached, so it needs to be attached post boot.
+* SD card controller apparently use the USB bus bandwidth, which can cause problems with loading data to both an external USB drive and SD card during  sampling above 1.5[Mz].
+* Ethernet controller also uses the USB bus.
+
 
 ##TESTING RESULTS:
 
