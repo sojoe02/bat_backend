@@ -17,6 +17,7 @@ int old_value = 0, new_value = 0;
 int x[NUM_DEVICES] = {0, 0, 0, 0, 0, 0, 0, 0};
 int store[NUM_DEVICES][SUM];	//classic circular array --mhs
 int sum[NUM_DEVICES] = {0, 0, 0, 0, 0, 0, 0, 0};
+bool recording[NUM_DEVICES] = {false, false, false, false, false, false, false, false};
 //vector for storing which devives are recording already --mhs
 int least_sig_val[NUM_DEVICES];	//address to the least significant (= earliest)
 								//value in the store. --mhs

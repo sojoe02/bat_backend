@@ -187,10 +187,10 @@ void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_p
 	uint32_t byte_size = (arg_sample_to - arg_sample_from)*(sizeof(Sample)) ; 
 
 
-	char *snapshot_space;
-	char *buffer_ptr;
+	char *snapshot_space; 																//pointer --mhs
+	char *buffer_ptr;																	//pointer --mhs
 
-	buffer_ptr = _c_buffer.get_Sample(arg_sample_from);
+	buffer_ptr = _c_buffer.get_Sample(arg_sample_from);									//this might be the pointer I actually need --mhs 
 
 	//allocate anonymous memmap for the snapshot data:
 	snapshot_space = (char*)mmap(NULL,byte_size, 
