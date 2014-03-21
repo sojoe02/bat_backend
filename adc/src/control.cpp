@@ -252,8 +252,9 @@ int main(int argc, char *argv[]){
 
 			char buffer[512];
 
-			if(input_data.size() !=  6){
+			if(input_data.size() !=  5){
 				sprintf(buffer, "too few or many arguments for taking snapshot series ");
+				warnx(buffer);
 				write_error("arg",buffer);			
 			} else{
 
@@ -262,6 +263,8 @@ int main(int argc, char *argv[]){
 					uint32_t sample_length = stoull(input_data[2]);
 					uint32_t count = stoull(input_data[3]);
 					string path = input_data[4];			
+
+					sample_number = sample_number + sample_length;
 
 					printf("taking snapshots in sequence\n");
 
@@ -280,11 +283,11 @@ int main(int argc, char *argv[]){
 						warnx("%s", buffer);
 						write_error(path.c_str(), buffer);
 					} 
-					else if(sample_number < (Utility::LAST_SAMPLE - sample_length)){
-						sprintf(buffer,"the sample you want is obsolete");
-						warnx("%s",buffer);
-						write_error(path.c_str(), buffer);
-					}
+					//else if(sample_number < (Utility::LAST_SAMPLE - sample_length)){
+					//	sprintf(buffer,"the sample you want is obsolete");
+					//	warnx("%s",buffer);
+					//	write_error(path.c_str(), buffer);
+					//}
 					else{
 						Utility::SNAPSHOT_BLOCK_SIZE = sample_length/4096;
 						Utility::SNAPSHOT_BYTE_SIZE = sample_length * sizeof(Sample);
@@ -310,7 +313,7 @@ int main(int argc, char *argv[]){
 			}else{
 				try{
 				uint32_t count = stoull(input_data[1]);
-				uint32_t sample_length = 120e6/sizeof(Sample);
+				uint32_t sample_length = 96e6/sizeof(Sample);
 				Utility::SNAPSHOT_BLOCK_SIZE = (sample_length*sizeof(Sample))/4096;
 				Utility::SNAPSHOT_BYTE_SIZE = sample_length*sizeof(Sample);
 				std::string path = "/mnt/simple_shot";
@@ -380,13 +383,13 @@ void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uin
 	uint32_t byte_size = Utility::SNAPSHOT_BYTE_SIZE;
 	uint32_t samples_pr_snapshot = Utility::SNAPSHOT_BYTE_SIZE / sizeof(Sample);
 
-	_serial_snapshotting = true;
+		_serial_snapshotting = true;
 
-	uint32_t i = 1;
-	//starting the snapshot loop, which is controlled by the recorder thread.
-	while( _serial_snapshotting == true && arg_count >= i ){
+		uint32_t i = 1;
+		//starting the snapshot loop, which is controlled by the recorder thread.
+		while( _serial_snapshotting == true && arg_count >= i ){
 
-		printf("waiting for condition variable to be set\n");
+			printf("waiting for condition variable to be set\n");
 
 		Utility::CV.wait(lk,[]{return Utility::SNAP_READY;});
 		Utility::SNAP_READY = false;
@@ -413,7 +416,7 @@ void serial_snapshot(uint32_t arg_sample_number, uint32_t arg_sample_length, uin
 
 	}
 	lk.unlock();
-	_serial_snapshotting == false;
+	_serial_snapshotting = false;
 
 
 }

@@ -76,6 +76,8 @@ class Recorder{
 
 
 			int buffer = 1048576*40;
+			buffer = (buffer * 4096)/4096;
+
 			if(comedi_set_max_buffer_size(_device, 0, buffer) < 0 ){
 				printf("Failed to set max buffer size to %i bytes\n", buffer);
 				return -1;
@@ -146,7 +148,7 @@ class Recorder{
 				Utility::LAST_SAMPLE += samples_pr_block;
 
 				if(tmp_block >= Utility::SNAPSHOT_BLOCK_SIZE){
-					printf("signalling serial snapshotter\n");
+					//printf("signalling serial snapshotter\n");
 					tmp_block = 0;
 					Utility::SNAP_SAMPLE = active_sample;
 					Utility::SNAP_READY = true;
@@ -155,7 +157,7 @@ class Recorder{
 
 				if(write_address == arg_end_address){
 					write_address -= arg_buffer_size;
-					printf("resetting to beginning of buffer\n");
+					//printf("resetting to beginning of buffer\n");
 				}
 
 				if(_stop == true)
