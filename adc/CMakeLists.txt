@@ -25,11 +25,11 @@ set (GENERAL
 #Set subdirectories:
 #------------------------------------------------
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
-add_executable(adc_grapper ${GENERAL})
+add_executable(snapshot ${GENERAL})
 #------------------------------------------------
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(adc_grapper -lcomedi -lm)
+target_link_libraries(snapshot -lcomedi -lm)
 #------------------------------------------------
 #Set compiler flags
 #------------------------------------------------

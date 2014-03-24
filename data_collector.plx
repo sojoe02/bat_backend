@@ -9,7 +9,7 @@ This is a script that is designed to test the adc conversion and collect relevan
 #setup testing variables:
 my $max_temp = 85; #Celcius
 my $FIFO = '/home/pi/grapper.cmd';
-my $update_freq = 5; #seconds
+my $update_freq = 30; #seconds
 my $max_run_time = 25;#3600*10; #seconds
 
 #setup the data collection file(s)
@@ -30,32 +30,21 @@ chomp(my $temp = `less /sys/class/thermal/thermal_zone0/temp`);
 my $run_time = 0;
 
 #start the adc program and wait for the pipe to appear:
-
-my $pid;
-
-if($pid = fork){
-	
-}
-elsif(defined $pid){
-	
-}
-
-
-"adc/build/adc_grapper $FIFO&" ;
+#"adc/build/adc_grapper $FIFO&" ;
 
 #say "Waiting on adc_grapper to create pipe interface:"
 #open the pipe and send start_rec command:
 open (FIFO, ">$FIFO") || die "can't open $FIFO: $!";
 
-#start the sampling.
-#print FIFO "start_rec";
 sleep(1);
 #start the simple serial snapshotting thread.
+print FIFO "start_rec\n";
+sleep(1);
+print FIFO "simple_snap 10\n";
 
-print FIFO "start_rec";
 #monitor the system and stop it if it gets too hot or runtime is over:
 while($temp < $max_temp or $run_time < $max_run_time){
-	
+		
 	chomp($temp = `less /sys/class/thermal/thermal_zone0/temp`);
 	print FILE_temp $temp, " ";
 	say "$temp";
