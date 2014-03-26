@@ -1,27 +1,27 @@
 
 /*
- * =====================================================================================
- *
- *       Filename:  control.cpp
- *
- *    Description:  Control is the interface into the data grapper it uses POSIX
- *			to control data recording, this piece of software is designed to run in a 
- *			Raspberry Pi, it can sample an analog source at 3[Mhz] into a circular
- * 			buffer located in a temporary file in /dev/shm.
- *			Raw data snapshots can be taken via the snapshot command, these will be saved.
- *			locally in a uid named file.
- *			For 3[Mhz] sampling it's recommended to overclock the Pi to 900[Mhz]. 
- *
- *        Created:  2013-11
- *       Revision:  none
- *       Compiler:  gcc (g++ C11 compatible)
- *
- *         Author:  Soeren V. Joergensen, svjo@mmmi.sdu.dk
- *   Organization:  MMMI, University of Southern Denmark
- *		  Version:	0.8
- *
- * =====================================================================================
- */
+* =====================================================================================
+*
+*       Filename:  control.cpp
+*
+*    Description:  Control is the interface into the data grapper it uses POSIX
+*			to control data recording, this piece of software is designed to run in a 
+*			Raspberry Pi, it can sample an analog source at 3[Mhz] into a circular
+* 			buffer located in a temporary file in /dev/shm.
+*			Raw data snapshots can be taken via the snapshot command, these will be saved.
+*			locally in a uid named file.
+*			For 3[Mhz] sampling it's recommended to overclock the Pi to 900[Mhz]. 
+*
+*        Created:  2013-11
+*       Revision:  none
+*       Compiler:  gcc (g++ C11 compatible)
+*
+*         Author:  Soeren V. Joergensen, svjo@mmmi.sdu.dk
+*   Organization:  MMMI, University of Southern Denmark
+*		  Version:	0.8
+*
+* =====================================================================================
+*/
 
 
 
@@ -38,6 +38,12 @@
 #include<ctime>
 #include<iostream>
 #include<fstream>
+
+#include<unistd.h>
+
+//extern "C"{
+	#include<sched.h>
+//}
 
 //C11 threading:
 #include<atomic>
@@ -95,6 +101,11 @@ struct Sample{
 	uint16_t sample[8];
 };
 
+//struct sched_param{
+//	int priority;
+//};
+
+
 
 C_Buffer<Sample> _c_buffer(BUFFER_SIZE);
 Recorder<Sample> _recorder;
@@ -106,7 +117,27 @@ Recorder<Sample> _recorder;
  * regular bash.
  */ 
 int main(int argc, char *argv[]){
+//extern "C"{
 
+	struct sched_param param;
+
+	//param.priority = sched_get_priority_max(SCHED_RR);
+
+	//if(sched_setscheduler(getpid(), SCHED_RR, param) == -1 ){
+	//	perror("sched_setscheduler");		
+	//}
+	//
+	int my_pid = 0;
+
+	sched_getparam(getpid(), &param);
+	
+	param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+	
+	if( sched_setscheduler(getpid(), SCHED_FIFO, &param ) == -1 )
+	{
+		perror("sched_setscheduler");
+	}
+//}
 	_serial_snapshotting = false;
 	_stop_serial_snap = false;
 
@@ -115,7 +146,7 @@ int main(int argc, char *argv[]){
 	//open the cmd pipe:
 	FILE* f_pipe;
 	char f_buffer[1024];
-	std::string filename = "/home/pi/grapper.cmd";
+	std::string filename = "/home/sojoe/grapper.cmd";
 	char device[] = "/dev/comedi0";
 
 	printf("---------------------------------------------------\n");
@@ -166,6 +197,10 @@ int main(int argc, char *argv[]){
 	}
 	printf("---------------------------------------------------\n");
 	f_pipe = fopen(filename.c_str(), "r");
+
+	
+
+
 
 	while(1){
 
