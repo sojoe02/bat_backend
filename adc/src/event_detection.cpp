@@ -36,12 +36,20 @@ int main() {
 
 	for(int i = 0; i < NUM_DEVICES; i++) {
 		//get value/sound data from pointer, put int array x[] --mhs
+		
+		//get oldest value from store --mhs
 		old_value = store[i][least_sig_value];
+		
+		//just rebranding newest value --mhs
 		new_value = x[i];
 
+		//calculate sum --mhs
 		sum[i] = sum[i] - old_value * old_value + new_value * new_value;
+		
+		//save newest value for later --mhs
 		insert(new_value, i);
 
+		//check if the registered sounds are louder than the threshold --mhs
 		if(sum[i] > THRESHOLD) { //remember to avoid multiple of the same device --mhs
 			batsound_present(i);	//should create new thread to handle this,
 									//to allow bats at more than one location
@@ -50,20 +58,23 @@ int main() {
 	}
 }
 
-int insert(int num, int index) {
-	if(least_sig_value[index] > (SUM - 1)) {
+void insert(int num, int index) {
+	//avoid overflow in circular buffer --mhs
+	if(least_sig_value[index] > (SUM - 2)) {
 		least_sig_value[index] = -1;	//intentionally off by one - see just below --mhs
 	}
 
+	//move to next (= oldest) sample --mhs
 	least_sig_value[index]++;	//no if-statement to avoid additional overhead --mhs
 
+	//store latest sample in circular buffer --mhs
 	store[index][least_sig_value[index]] = num;
-
-	return 1;
 }
 
 void batsound_present(int index) {
 	//UDP to Perl script to start recording --mhs
-	//get value/sound data from pointer for -index- device, put in dedicated 
-	//
+	//get value/sound data from pointer for -index- device, put in dedicated thread --mhs
+	recording[index] = true;
+	
+
 }
