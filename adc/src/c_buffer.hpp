@@ -13,6 +13,7 @@
  *   Compiler:  gcc(C11)
  *
  *   Author:  Soeren V. Joergensen, svjo@mmmi.sdu.dk
+ *   Co-author:	Malthe Hoej-Sunesen, only lines with --mhs postfix
  *   Organization:  MMMI, University of Sourthern Denmark
  *
  * =====================================================================================
@@ -64,7 +65,7 @@ class C_Buffer{
 
 			printf("total amount of samples available %f\n", (double)_byte_size/(double)sizeof(Type));
 			_sample_amount = uint64_t(_byte_size/sizeof(Type));
-			//optimization: Why calculate the same number twice? --mhs
+
 
 			_status = ftruncate(file_descriptor, _byte_size);
 			if(_status)
@@ -91,7 +92,7 @@ class C_Buffer{
 					PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, file_descriptor,0);
 
 			if(address != _address + _byte_size)
-				errx(1, "ring buffer does not eat it's own tail");
+				errx(1, "ring buffer does not eat its own tail");
 
 			_status = close(file_descriptor);
 			if(_status)
@@ -133,8 +134,7 @@ class C_Buffer{
 		uint32_t get_Buffer_Size(){
 			return _byte_size;
 		}
-
-
+	
 
 	private:
 		uint32_t _byte_size; //number of bytes the buffer fills in virtual memory:
@@ -150,6 +150,8 @@ class C_Buffer{
 		uint32_t _status; //debug variable.
 		uint32_t _sample_size; //byte size of each sample.
 		uint64_t _sample_amount;
+		
+		bool _address_updated;
 
 };
 #endif // C_BUFFER_HPP

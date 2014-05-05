@@ -20,6 +20,9 @@ BEGIN {
 # Author:     John Hallam
 # Created:    2013-09-30
 # Last Edit:  2013-10-17
+#
+# Lines with the following signature: --mhs
+# are written by Malthe Høj-Sunesen
 
 #=============== OPTIONS, GLOBALS, DEFAULTS ===============
 
@@ -58,7 +61,7 @@ my @def_gpio	= ( $ENV{GPIO_PATH}, "/sys/class/gpio" );
 my @def_ltc2637 = ( $ENV{LTC2637}, "/dev/i2c-1", );
 my @def_sys1w   = ( $ENV{'1WIRE'}, safe_concat($ENV{TMPDIR}, "/1wire/"), "/tmp/1wire", );
 my @def_snap    = ( $ENV{SNAPSHOT}, safe_concat($ENV{TMPDIR}, "/array-snapshot"), "/tmp/array-snapshot", );
-my @def_tmp	= ( $ENV{TMPDIR}, "/tmp", );
+my @def_tmp		 = ( $ENV{TMPDIR}, "/tmp", );
 my @def_snapdir = ( $ENV{SNAPDIR}, safe_concat($ENV{TMPDIR}, "/snapshots"), "/tmp/snapshots", );
 my @def_iface   = ( $ENV{IFACE}, "eth0", );
 my @def_port    = ( $ENV{PORT}, 2468, );
@@ -100,6 +103,7 @@ my %commands = (
     trig => [ \&trigger, ],
     snap => [ \&snapshot, ],
     msnap=> [ \&multisnap, ],
+
     set  => [ \&set, ],
     gain => [ \&channel_gain, ],
     chan => [ \&channel_list, ],
@@ -113,7 +117,9 @@ my %commands = (
     adc  => [ \&set_adc_board, ],
     start=> [ \&sys_start, ],
     help => [ \&cmd_help, 0, ],
-    );
+	csnap=> [ \&continuoussnap, ],		#--mhs
+	cstop=> [ \&continuoussnap_stop, ],	#--mhs
+	);
 
 # The snapshotter program accepts commands given below.  We assume that whenever this script starts there is
 # a clean snapshotter process waiting for commands from it:  it is the job of the daemontools/runit logic to
@@ -125,10 +131,12 @@ my %snap_cmds = (		# See snapshotter C++ code for more details
     quit => 'exit',				# Cause snapshotter to exit
     snap => 'snapshot %Lu %lu %s',		# Take a simple single snapshot <from,U64> <to,U64> <path>
     msnap=> 'serial_snapshot %Lu %lu %lu %s',	# Take snapshot sequence <start,U64> <length,U32> <count,U32> <path>
-    mstop=> 'serial_stop',			# Stop snapshot sequence thread
-    hold => 'stop_rec',				# Stop ADC conversion process
+	mstop=> 'serial_stop',			# Stop snapshot sequence thread
+	hold => 'stop_rec',				# Stop ADC conversion process
     start=> 'start_rec',			# Begin ADC conversion (trigger permitting)
     rate => 'set_sr %d',			# Set sample rate <sr[Hz]> (default and max 3[MHz])
+	csnap=> 'continuous_snapshot %Lu %s',	# Start continuous snapshot <from,U64> <path> --mhs
+    cstop=> 'continuous_stop %Lu %s',		# Stop continuous snapshot <from,U64> <path>--mhs
     );
 
 my $snap_started = 0;		# Is the snapshotter capturing ('start' sent, not 'held')
@@ -179,6 +187,10 @@ GetOptions(
     'gpio|g=s'		 => \$gpio,
     'mode|m=s'		 => \$mode,
     ) or usage();
+
+#=============== INITIALIZE HASH FOR CONTINUOUS RECORD ===============
+
+my %running_recordings;
 
 my $running = !$dry_run;		# Main loop is running
 
@@ -1106,7 +1118,7 @@ sub do_snapshot {
 	return;
     }
     # Reply to master
-    return send_reply($from, "snap", "snapshot $m_uuid in progress\n")
+    return send_reply($from, "snap", "snapshot $m_uuid in progress\n");
 }
 
 ### Command subroutines for this program
@@ -1382,6 +1394,130 @@ sub multisnap {
     };
     return do_snapshot($from, $first, $length, $count, $m_uuid);
 }
+
+# Set up metadata and instruct the continuous process to start recording
+sub continuoussnap { #Whole subroutine by --mhs, modifed from sub snapshot
+	my ($from, $begin, $count, $m_uuid) = @_;
+	my $first;
+	my $offset = $params{offset} || 0;
+	my $now;
+	# Check snapshot parameters: time should be within range
+	do {
+		local $! = 0;
+		$now = time() - $offset;
+		if($begin =~ m/^#(.+)$/) {
+			my $b = POSIX::strtoul($1);
+			if($!) {
+				error("Snapshot start time illegal");
+				return send_reply($from, "csnap", "continuous snapshot start '$begin' illegal: $!\n");
+			}
+			# Check that the first sample is within the ring buffer NOT DONE YET
+			$first = $b;
+		} else {
+			my $b = POSIX::strtod($begin);
+			if($!) {
+				error("Snapshot start time illegal");
+				return send_reply($from, "csnap", "continuous snapshot start '$begin' illegal: $!\n");
+			}
+			$begin = $b - $offset;
+			if($begin <= ($now - RINGBUFLENGTH/1000.0) ) { #Snapshot start falls outside the ring buffer
+				error("Snapshot command $m_uuid misses ringbuffer\n");
+				return send_reply($from, "csnap", "snapshot command $m_uuid misses ringbuffer\n");
+			}
+			# Convert to sample indices
+			$first = int($begin * $freq + 0.5);
+			
+		}
+	};
+	# maybe send start time ($begin) when stopping recording? That could trigger the end in the
+	# continuoussnap_stop... Yep, going to do that. 
+	# need something unique for stopping recording. Maybe some sort of threading.
+	# However, all this really needs to do is to calculate the length for the metadata. No threading 
+	# needed, a hashtable with the $begin is enough. 
+	
+	$running_recordings{$from . $begin . "now"} = $now;
+	$running_recordings{$from . $begin . "first"} = $first;
+	$running_recordings{$from . $begin . "offset"} = $offset;
+	$running_recordings{$from . $begin . "m_uuis"} = $m_uuid;
+	
+	unless(send_snap_cmd('csnap', $first, $count) ) {
+		error("Cannot initiate $m_uuid");
+		return send_reply($from, "csnap", "snapshot $m_uuid comms error: $!\n");
+	}
+	
+	# Send reply to master
+	return send_reply($from, "csnap", "snapshot $m_uuid in progress\n");
+}
+
+sub continuoussnap_stop { # Whole subroutine by --mhs, modified from do_snapshot
+	my ($from, $begin, $end, $count, $m_uuid) = @_;
+	
+	my $first = $running_recordings{$from . $begin . "first"};
+	
+	my $length = int($freq*($end - $begin) + 0.5);
+	# Estimate the size of the file of samples to be generated
+	my $size = $length * NCHANNELS * 2;
+	# Construct local snapshot UUID
+	my $s_uuid = new_uuid();
+	# Construct the snapshot's processing directory
+	my $sndir = $tmp . "/" . $s_uuid;
+	unless(mkdir($sndir)) {
+		error("Cannot create snapshot directory $sndir");
+		return send_reply($from, "csnap", "snapshot $m_uuid server dir error: $!\n");
+	}
+	# Create the various file paths for the snapshot components
+	my $snpath   = $sndir . "/vars.sh";
+	my $metadata = $sndir . "/metadata";
+	my $samples  = $snapdir . '/' . $s_uuid;
+	# Write out channel variables file for snapshot
+	my @sox = sox_arg();
+	
+	unless(spurtfile($snpath, 
+			dump_hash(
+				{	MASTER_UUID		=>	$m_uuid,
+					SAMPLES			=>	$samples,
+					METADATA		=>	$metadata,
+					SIZE			=>	$size,
+					FIRST			=>	$first,
+					NCHANNELS		=>	$sox[0],
+					SOXARG			=>	$sox[1],
+					BOX				=>	$mac,
+					FREQ			=>	$freq,
+					NFILES			=>	$count,
+					THISFILE		=>	$count-1,
+				}
+			)
+		)
+	)	
+	{	error("Cannot create snapshot variables $snpath");
+		return send_reply($from, "cstop", "snapshot $m_uuid server varfile error: $!\n");
+	}
+	
+	# Write out the FLAC metadata file
+	unless(
+		spurt_file(
+			$metadata, 
+			channel_meta(
+				BOX		=>	$mac,
+				FIRST	=>	$first,
+				CTIME	=>	time(),
+				FREQ	=>	$freq,
+			)
+		)
+	)
+	{	error("Cannot create metadata file $metadata");
+		return send_reply($from, "cstop", "snapshot $m_uuid metadata error: $!\n");
+	}
+	
+	unless(send_snap_cmd('cstop', $first, $count, $m_uuid) ) {
+		error("Cannot stop recording of $m_uuid");
+		return send_reply($from, "cstop", "snapshot $m_uuid comms error: $!\n");
+	}
+	# Send command to snapshot process
+	return send_reply($from, "cstop", "stopping snapshot $m_uuid.\n");
+
+}
+
 
 # Rescan the 1-wire bus filesystem
 sub rescan1w {

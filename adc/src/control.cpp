@@ -17,6 +17,7 @@
  *       Compiler:  gcc (g++ C11 compatible)
  *
  *         Author:  Soeren V. Joergensen, svjo@mmmi.sdu.dk
+ *      Co-author:	Malthe Hoej-Sunesen, only lines with --mhs postfix
  *   Organization:  MMMI, University of Southern Denmark
  *
  * =====================================================================================
@@ -42,6 +43,7 @@
 #include "recorder.hpp"
 #include "c_buffer.hpp"
 #include "../build/bat.h"
+#include "Net.h"
 
 using namespace std;
 
@@ -51,7 +53,10 @@ void stop_recording();
 void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]);
 void start_recording(char arg_device[], uint32_t arg_sample_rate, 
 		char* arg_start_address, char* arg_end_address, int arg_buffer_size);
-
+void start_continuous_recording(char arg_device[], uint32_t arg_sample_rate,
+		char* arg_start_address, int arg_buffer_size);
+void stop_recording(char arg_device[], uint32_t arg_sample_rate, 
+		char* arg_start_address, int arg_buffer_size);
 bool _running = true;
 bool _recording = false;
 //status integer:
@@ -80,17 +85,21 @@ int main(int argc, char *argv[]){
 	string cmd_stop_rec = "stop_rec";
 	string cmd_take_snapshot = "snapshot";
 	string cmd_set_sr = "set_sr";
+	string cmd_start_cont_rec = "start_cont_rec";
+	string cmd_stop_cont_rec = "stop_cont_rec";
 	string input;
 
 	printf("CMDs available are \n");
 	printf("'exit'\texits the grapper\n");
 	printf("'start_rec'\tstarts the recorder module\n");
 	printf("'stop_rec'\tstops the recorder module\n");
+	printf("'start_cont_rec'\tstarts a continuous recording\n");
+	printf("'stop_cont_rec'\tstops a continuous recording\n");
 
 	umask(0);
 
 	printf("Creating Pipe... Waiting for receiver process...\n\n");
-	//TRY TO CRATE A NAMED PIPE
+	//TRY TO CREATE A NAMED PIPE
 	if (mkfifo(filename,0666)<0){
 		perror("FIFO (named pipe) could not be created, it exists already?");
 		//exit(-1);
@@ -105,17 +114,16 @@ int main(int argc, char *argv[]){
 		input = f_buffer;
 		printf("input is %s\n", input.c_str());
 
-		//Split the input string up and put comman and it's arguments in a vector:		
+		//Split the input string up and put command and it's arguments in a vector:		
 		istringstream iss(input);
 		vector<string> input_data{istream_iterator<string>{iss},
 			istream_iterator<string>{}};
 
 
-		if(cmd_start_rec.compare(input_data[0]) == 0){
+		if((cmd_start_rec.compare(input_data[0]) == 0) && (cmd_start_cont_rec.compare(input_data[0]) == 0)){
 			if(_recording){
 				printf("System is recording, you need to stop ('stop_rec') it to restart it\n");
-
-			}else{
+			}else {
 				printf("Starting recording at %u[Hz]\n", _sample_rate);
 
 				_record_thread = new thread(start_recording, device, 
@@ -187,10 +195,10 @@ void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_p
 	uint32_t byte_size = (arg_sample_to - arg_sample_from)*(sizeof(Sample)) ; 
 
 
-	char *snapshot_space; 																//pointer --mhs
-	char *buffer_ptr;																	//pointer --mhs
+	char *snapshot_space;
+	char *buffer_ptr;
 
-	buffer_ptr = _c_buffer.get_Sample(arg_sample_from);									//this might be the pointer I actually need --mhs 
+	buffer_ptr = _c_buffer.get_Sample(arg_sample_from);	
 
 	//allocate anonymous memmap for the snapshot data:
 	snapshot_space = (char*)mmap(NULL,byte_size, 
@@ -211,8 +219,6 @@ void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_p
 	munmap(snapshot_space,byte_size);
 }
 
-//wouldn't this do basically what I need? Investigate start_address,
-//end_address (fixed time/snaphot?) if those pose a problem --mhs
 void start_recording(char arg_device[], uint32_t arg_sample_rate, 
 		char* arg_start_address, char* arg_end_address, int arg_buffer_size){
 
@@ -229,4 +235,9 @@ void stop_recording(){
 	_recording = false;
 }
 
-
+void start_continuous_recording(char arg_device[], uint32_t arg_sample_rate,
+		char* arg_start_address, int arg_buffer_size)	{
+	
+}
+void stop_recording(char arg_device[], uint32_t arg_sample_rate, 
+		char* arg_start_address, int arg_buffer_size);
