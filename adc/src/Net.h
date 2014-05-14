@@ -48,7 +48,8 @@
 #include <mutex> //--mhs
 #include <stdlib.h> //--mhs - added "just in case"
 #include <unistd.h>
-
+#include <cstring>
+#include <string>
 using namespace std;
 
 namespace net
@@ -252,14 +253,15 @@ namespace net
 			assert( data );
 			assert( size > 0 );
 		
-			if ( socket == 0 )
+			if ( socket == 0 )	{
+				printf("Socket failed.\n");
 				return false;
+			}
 		
 			sockaddr_in address;
 			address.sin_family = AF_INET;
 			address.sin_addr.s_addr = htonl( destination.GetAddress() );
 			address.sin_port = htons( (unsigned short) destination.GetPort() );
-
 			int sent_bytes = sendto( socket, (const char*)data, size, 0, (sockaddr*)&address, sizeof(sockaddr_in) );
 
 			return sent_bytes == size;
@@ -296,100 +298,6 @@ namespace net
 	private:
 	
 		int socket;
-	};
-	
-	class BatUDP // Entire class by --mhs
-	{
-	public:
-		BatUDP()	{
-			_callInitializeSockets(SENDING_PORT);
-			_addr = Address(192,168,1,139, SENDING_PORT);
-		}
-		
-		BatUDP(int aaa, int bbb, int ccc, int ddd, short port)	{
-			_callInitializeSockets(SENDING_PORT);
-			_addr = Address(aaa, bbb, ccc, ddd, port);
-		}
-		
-		~BatUDP()	{
-			ShutdownSockets();
-		}
-		
-		void start_recording(char* arg_device, uint32_t arg_sample_rate, 
-				char* arg_start_address) { 
-			//	printf("Attempting to launch thread for sending <start> message\n");
-			//	std::thread BatUDP_t1(&BatUDP::_start_recording_thread, this, arg_device, arg_sample_rate, arg_start_address);
-			//	BatUDP_t1.detach();
-			printf("Checkpoint 2a\n");
-			char sample_rate[16];
-			printf("Checkpoint 2\n");
-			snprintf(sample_rate, sizeof(sample_rate), "%lu", (unsigned long)arg_sample_rate);
-			string tmp = "csnap\t" + string(arg_device) + "\t" + string(sample_rate) + "\t" + string(arg_start_address);
-			printf("Checkpoint 3\n");
-			const char* data[] = tmp.c_str();
-			printf("Checkpoint 4\n");
-			socket_mutex.lock();
-			//printf("Attempting to send <start>\n");
-			printf("Checkpoint 5\n");
-			socket.Send(_addr, data, sizeof(data));
-			printf("<start> should have been sent by now\n");
-			socket_mutex.unlock();
-		}
-		
-		void stop_recording(char* arg_device, uint32_t arg_sample_rate, 
-				char* arg_start_address, char* arg_end_address) {
-			//	printf("Attempting to launch thread for sending <stop> message\n");
-				std::thread BatUDP_t2(&BatUDP::_stop_recording_thread, this, arg_device, arg_sample_rate, arg_start_address,
-					arg_end_address);
-				BatUDP_t2.detach();
-		}
-		
-	private:
-		
-		Address _addr;
-		Socket socket;
-		
-		void _callInitializeSockets(short _port) {
-			printf("Creating outgoing socket on port %i\n", _port);
-			if(!InitializeSockets())	{
-				printf("Failed to initialize sockets. Program cannot continue.\n");
-				exit(1);
-			}
-		}
-			
-		/*void _start_recording_thread(char* arg_device, uint32_t arg_sample_rate, 
-			char* arg_start_address) {
-			//printf("Thread for sending <start> created.\n");
-			char sample_rate[16];
-			snprintf(sample_rate, sizeof(sample_rate), "%lu", (unsigned long)arg_sample_rate);
-			string tmp = "csnap\t" + string(arg_device) + "\t" + string(sample_rate) + "\t" + string(arg_start_address);
-			const char data[] = tmp.c_str();
-			socket_mutex.lock();
-			//printf("Attempting to send <start>\n");
-			socket.Send(_addr, data, sizeof(data));
-			printf("<start> should have been sent by now\n");
-			socket_mutex.unlock();
-			//TODO: Check in Perl (array-cmd.sdx) how the command is received and how much I can add to it.
-			//TODO: See if this is good enough. Whitespace delimiter is as per Perl script: 
-				//$msg =~ s/\s#\s+/ #/g;	# Attach prefix # to following argument, if separated by whitespace
-				//my @msg = split /\s+/, $msg;
-		}*/
-		
-		void _stop_recording_thread(char* arg_device, uint32_t arg_sample_rate, 
-			char* arg_start_address, char* arg_end_address)	{
-			//printf("Thread for sending <stop> created.\n");
-			char sample_rate[16];
-			snprintf(sample_rate, sizeof(sample_rate), "%lu", (unsigned long)arg_sample_rate);
-			string tmp = "cstop\t" + string(arg_device) + "\t" + string(sample_rate) + "\t" + string(arg_start_address) + "\t" + string(arg_end_address);
-			const char data[] = tmp.c_str();
-			socket_mutex.lock();
-			//printf("Attempting to send <stop>\n");
-			socket.Send(_addr, data, sizeof(data));
-			printf("<stop> should have been sent by now\n");
-			socket_mutex.unlock();
-			//TODO: See if this is good enough.
-		}
-				
 	};
 }
 #endif
