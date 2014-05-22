@@ -354,7 +354,7 @@ do {
     debug(2, "$$: will use $ltc2637 to talk to DAC and 1-wire") unless( $errors > $errs );
 };
 
-# Deterine mode of operation (master, slave, single)
+# Determine mode of operation (master, slave, single)
 
 do {
     my $errs = $errors;
@@ -1399,14 +1399,14 @@ sub multisnap {
 
 # Set up metadata and instruct the continuous process to start recording
 sub continuoussnap { #Whole subroutine by --mhs, modifed from sub snapshot
-	my ($from, $begin, $count, $m_uuid) = @_;
-	my $first;
+	my ($from, $begin, $end, $time, $m_uuid) = @_;
 	my $offset = $params{offset} || 0;
-	my $now;
+    my ($first, $length);
+
 	# Check snapshot parameters: time should be within range
 	do {
 		local $! = 0;
-		$now = time() - $offset;
+		$now = $time - $offset;
 		if($begin =~ m/^#(.+)$/) {
 			my $b = POSIX::strtoul($1);
 			if($!) {
@@ -1431,38 +1431,45 @@ sub continuoussnap { #Whole subroutine by --mhs, modifed from sub snapshot
 			
 		}
 	};
-	# maybe send start time ($begin) when stopping recording? That could trigger the end in the
-	# continuoussnap_stop... Yep, going to do that. 
-	# need something unique for stopping recording. Maybe some sort of threading.
-	# However, all this really needs to do is to calculate the length for the metadata. No threading 
-	# needed, a hashtable with the $begin is enough. 
-	
-	$running_recordings{$from . $begin . "now"} = $now;
-	$running_recordings{$from . $begin . "first"} = $first;
-	$running_recordings{$from . $begin . "offset"} = $offset;
-	$running_recordings{$from . $begin . "m_uuis"} = $m_uuid;
-	
-	# Functions below removed - this script is really only needed for the metadata.
-	
-	#unless(send_snap_cmd('csnap', $first, $count) ) {
-	#	error("Cannot initiate $m_uuid");
-	#	return send_reply($from, "csnap", "snapshot $m_uuid comms error: $!\n");
-	#
-	
-	# Send reply to master
-	#return send_reply($from, "csnap", "snapshot $m_uuid in progress\n");
+	do {
+    local $! = 0;
+    if( $end =~ m/^#(.+)$/ ) {               # Sample-based finish
+        my $e = POSIX::strtoul($1);
+        if( $! ) {
+        error("Snapshot finish time illegal");
+        return send_reply($from, "snap", "snapshot finish '$end' illegal: $!\n");
+        }
+        $length = $e - $first;
+        if( $length > $freq*MAXSNAPSHOT/1000 ) {
+        error("Snapshot command $m_uuid is too long ($length samples)\n");
+        return send_reply($from, "snap", "snapshot command $m_uuid is too long ($length samples)\n");       
+        }
+    } else {                         # Wall-clock-based finish
+        my $e = POSIX::strtod($end);
+        if( $! ) {
+        error("Snapshot finish time illegal");
+        return send_reply($from, "snap", "snapshot finish '$end' illegal: $!\n");
+        }
+        $end = $e - $offset;
+        if( $end - $begin > MAXSNAPSHOT/1000.0 ) {
+        my $d = $end - $begin;
+        error("Snapshot command $m_uuid is too long ($d seconds)\n");
+        return send_reply($from, "snap", "snapshot command $m_uuid is too long ($d seconds)\n");        
+        }
+        $length = int($freq*($end - $begin) + 0.5);
+    }
+    };
+
+    return continuoussnap_stop($from, $first, $length, $time, $m_uuid);
 }
 
 sub continuoussnap_stop { # Whole subroutine by --mhs, modified from do_snapshot
-	my ($from, $begin, $end, $count, $m_uuid) = @_;
+	my ($from, $first, $length, $time, $m_uuid) = @_;
 	
-	my $first = $running_recordings{$from . $begin . "first"};
-	
-	my $length = int($freq*($end - $begin) + 0.5);
 	# Estimate the size of the file of samples to be generated
 	my $size = $length * NCHANNELS * 2;
 	# Construct local snapshot UUID
-	my $s_uuid = new_uuid();
+	my $s_uuid = m_uuid();
 	# Construct the snapshot's processing directory
 	my $sndir = $tmp . "/" . $s_uuid;
 	unless(mkdir($sndir)) {
@@ -1478,17 +1485,14 @@ sub continuoussnap_stop { # Whole subroutine by --mhs, modified from do_snapshot
 	
 	unless(spurtfile($snpath, 
 			dump_hash(
-				{	MASTER_UUID		=>	$m_uuid,		# Universally unique identifier
-					SAMPLES			=>	$samples,		# How many samples (do I need this?)
-					METADATA		=>	$metadata,		# Path of metadata
-					SIZE			=>	$size,			# Size of the recording
-					FIRST			=>	$first,			# What is this variable?
-					NCHANNELS		=>	$sox[0],		# Number of channels
-					SOXARG			=>	$sox[1],		# What is this?
-					BOX				=>	$mac,			# Mac address of the listening post
-					FREQ			=>	$freq,			# Sampling frequency
-					NFILES			=>	$count,			# The total number of files
-					THISFILE		=>	$count-1,		# This file's number in the line
+				{	MASTER_UUID		=>	$m_uuid, # I don't think samples is necessary here..
+					METADATA		=>	$metadata,
+					SIZE			=>	$size,
+					FIRST			=>	$first,
+					NCHANNELS		=>	$sox[0],
+					SOXARG			=>	$sox[1],
+					BOX				=>	$mac,
+					FREQ			=>	$freq,
 				}
 			)
 		)
@@ -1502,26 +1506,17 @@ sub continuoussnap_stop { # Whole subroutine by --mhs, modified from do_snapshot
 		spurt_file(
 			$metadata, 
 			channel_meta(
-				BOX		=>	$mac,						# Mac address of the listening post
-				FIRST	=>	$first,						# Again; what is this?
-				CTIME	=>	time(),						# Time of creation of the metadata (might need to send this from the C++ program so it is from the moment the recording starts
-				FREQ	=>	$freq,						# Sampling frequency
+				BOX		=>	$mac,
+				FIRST	=>	$first,
+				CTIME	=>	$time,
+				FREQ	=>	$freq,
 			)
 		)
 	)
 	{	error("Cannot create metadata file $metadata");
 		return send_reply($from, "cstop", "snapshot $m_uuid metadata error: $!\n");
 	}
-	
-	# Functions below removed - script is only really needed for the metadata
-	
-	#unless(send_snap_cmd('cstop', $first, $count, $m_uuid) ) {
-	#	error("Cannot stop recording of $m_uuid");
-	#	return send_reply($from, "cstop", "snapshot $m_uuid comms error: $!\n");
-	#
-	# Send command to snapshot process
-	#return send_reply($from, "cstop", "stopping snapshot $m_uuid.\n");
-
+    # No reply to master - the C++ program waits for 0.5 second for this to finish and closes the recording afterwards
 }
 
 sub pipetest {
