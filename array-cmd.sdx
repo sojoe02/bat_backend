@@ -66,7 +66,7 @@ my @def_snapdir = ( $ENV{SNAPDIR}, safe_concat($ENV{TMPDIR}, "/snapshots"), "/tm
 my @def_iface   = ( $ENV{IFACE}, "eth0", );
 my @def_port    = ( $ENV{PORT}, 2468, );
 my @def_host    = ( $ENV{HOST}, );
-my @def_freq	= ( $ENV{FREQ}, 3.75e5 );
+my @def_freq	= ( $ENV{FREQ}, 2e5 );
 my @def_mode    = ( $ENV{MODE}, 'single' );
 
 $::VERSION = "1.0";
@@ -119,6 +119,7 @@ my %commands = (
     help => [ \&cmd_help, 0, ],
 	csnap=> [ \&continuoussnap, ],		#--mhs
 	cstop=> [ \&continuoussnap_stop, ],	#--mhs
+	pipetest	=> [ \&pipetest,],		#--mhs
 	);
 
 # The snapshotter program accepts commands given below.  We assume that whenever this script starts there is
@@ -137,6 +138,7 @@ my %snap_cmds = (		# See snapshotter C++ code for more details
     rate => 'set_sr %d',			# Set sample rate <sr[Hz]> (default and max 3[MHz])
 	csnap=> 'continuous_snapshot %Lu %s',	# Start continuous snapshot <from,U64> <path> --mhs
     cstop=> 'continuous_stop %Lu %s',		# Stop continuous snapshot <from,U64> <path>--mhs
+	pipetest => 'pipetest',		# Test if the pipe is working (manual check) --mhs
     );
 
 my $snap_started = 0;		# Is the snapshotter capturing ('start' sent, not 'held')
@@ -198,7 +200,7 @@ my $running = !$dry_run;		# Main loop is running
 
 debug(1, "Verifying arguments for array-cmd[$$]");
 
-# Check smapling rate value is a positive double number
+# Check sampling rate value is a positive double number
 do {
     local $!= 0;
     my $errs = $errors;
@@ -1445,7 +1447,7 @@ sub continuoussnap { #Whole subroutine by --mhs, modifed from sub snapshot
 	#unless(send_snap_cmd('csnap', $first, $count) ) {
 	#	error("Cannot initiate $m_uuid");
 	#	return send_reply($from, "csnap", "snapshot $m_uuid comms error: $!\n");
-	#}
+	#
 	
 	# Send reply to master
 	#return send_reply($from, "csnap", "snapshot $m_uuid in progress\n");
@@ -1516,13 +1518,15 @@ sub continuoussnap_stop { # Whole subroutine by --mhs, modified from do_snapshot
 	#unless(send_snap_cmd('cstop', $first, $count, $m_uuid) ) {
 	#	error("Cannot stop recording of $m_uuid");
 	#	return send_reply($from, "cstop", "snapshot $m_uuid comms error: $!\n");
-	#}
+	#
 	# Send command to snapshot process
 	#return send_reply($from, "cstop", "stopping snapshot $m_uuid.\n");
 
 }
 
-
+sub pipetest {
+	
+}
 # Rescan the 1-wire bus filesystem
 sub rescan1w {
     my ($from) = @_;

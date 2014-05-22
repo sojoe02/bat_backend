@@ -35,6 +35,7 @@
 #include<algorithm>
 #include<iterator>
 #include<sstream>
+#include<fstream>
 
 //C11 threading:
 #include<atomic>
@@ -45,6 +46,7 @@
 #include "c_buffer.hpp"
 #include "../build/bat.h"
 #include "Net.h"
+#include "utility.h"
 
 #define PORT			2468	//--mhs
 #define	IP_A			127		//--mhs
@@ -55,7 +57,7 @@
 
 using namespace std;
 
-uint32_t _sample_rate = (uint32_t)30e5;
+uint32_t _sample_rate = (uint32_t)2e5;
 
 void stop_recording();
 void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]);
@@ -76,7 +78,8 @@ mutex send_UDP_mutex;//--mhs
 int ret = 0;
 
 thread* _record_thread;
-thread* analyzer;
+thread* _analyzer;
+thread* _sampler_thread;
 
 bool Utility::SNAP_READY = false;
 
@@ -184,38 +187,39 @@ int main(int argc, char *argv[]){
 			s_thread.detach();
 		}
 		
-		else if(cmd_start_cont_rec.compare(input_data[0] == 0)	{
+		else if(cmd_start_cont_rec.compare(input_data[0]) == 0)	{
 		//place actual recording command in here. DO NOT CALL UDP SENDING FUNCTION!!!
 			char buffer[512];
 			if(input_data.size() != 5)	{	//number of arguments for function!
 				sprintf(buffer, "too few or too many arguments for continuous recording ");
 				warnx(buffer);
-				write_error("arg", buffer);
+				//write_error("arg", buffer);
 			}	else	{
-				try{
+				
 					uint32_t count = stoull(input_data[3]); //change to correct argument number!!
-					string path = input_data[4]				//change to correct argument number!!
+					string path = input_data[4];			//change to correct argument number!!
 				
 					printf("starting continuous recording\n");
 					
 					if(_continuous_recording)	{
 						sprintf(buffer,"continuous recording already in progress; aborting");
 						warnx("%s", buffer);
-						write_error(path.c_str(), buffer);
+						//write_error(path.c_str(), buffer);
 					}	else if(!_recording)	{
 						sprintf(buffer, "system is not recording; aborting");
 						warnx("%s", buffer);
-						write_error(path.c_str(), buffer);
+						//write_error(path.c_str(), buffer);
 					}	else {
 						printf("starting continuous recording thread, to path: %s\n", path.c_str());
 						
-						_record_thread = new thread(start_continuous_recording, count, path.c_str())
+						//thread r_thread(start_continuous_recording, count, path.c_str());
+						//r_thread.detach();
 					}
-				}
+				
 			}
 		}
 
-		else if(cmd_stop_cont_rec.compare(input_data[0] == 0)	{
+		else if(cmd_stop_cont_rec.compare(input_data[0]) == 0)	{
 		//place actual stop recording command in here. DO NOT CALL UDP SENDING FUNCTION!!!
 		}
 		
@@ -286,10 +290,14 @@ void stop_recording(){
 	_recording = false;
 }
 
-void analyzer()	{
-	//need all the char arg_device[] in here somehow...
-	uint32_t sample_rate = 375000;
-	sampler = new thread(sampler, this, device1, sample_rate);
+void pipetest()	{
+	printf("Pipe is working, regard C++ program.\n");
+}
+
+/*void analyzer()	{
+	uint32_t sample_rate = 200000;
+	
+	_sampler_thread = new thread(sampler, this, device1, sample_rate);
 }
 
 void continuous_recording(uint32_t arg_count, const char arg_path[])	{
@@ -333,7 +341,7 @@ void continuous_recording(uint32_t arg_count, const char arg_path[])	{
 void stop_continuous_recording()	{
 	_stop_continuou_recording = true;
 	Utility::CV.notify_one();
-}
+}*/
 
 //whole function --mhs
 //If used in thread environment, please lock whole process with mutex!
@@ -346,26 +354,26 @@ bool send_command_start_continuous_recording(char arg_device[], uint32_t arg_sam
 	char sample_rate[16];		//for conversion from uint32_t to string, as per http://cboard.cprogramming.com/c-programming/104485-how-convert-uint32_t-string.html
 	snprintf(sample_rate, sizeof(sample_rate), "%lu", (unsigned long)arg_sample_rate);
 	string data = string(arg_device) + " " + string(sample_rate) + " " + string(arg_start_address);		//data to be sent
-	int data_length = static_cast<int>strlen(data.c_str());		//get length, not size, for sending; if sizeof, then size=4, only 4 bytes sent!
-	bool reply = socket.Send(Address(IP_A, IP_B, IP_C, IP_D, PORT),
+	int data_length = static_cast<int>(strlen(data.c_str()));		//get length, not size, for sending; if sizeof, then size=4, only 4 bytes sent!
+	bool reply = socket.Send(net::Address(IP_A, IP_B, IP_C, IP_D, PORT),
 		data.c_str(), (int)data_length);		//sent or not?
 	return reply;		//indicate success
 }
 
 //whole function --mhs
-bool send_command_stop_continuous_recording(char* arg_start_address, char* arg_end_address)	{
+bool send_command_stop_continuous_recording(char arg_device[], char* arg_start_address, char* arg_end_address)	{
 	net::Socket socket; 
 	if(!socket.Open(PORT))	{
 		printf("control.cpp: failed to create socket\n");
 		return false;
 	}
 	string data = string(arg_device) + " " + string(arg_start_address) + " " + string(arg_end_address);
-	int data_length = static_cast<int>strlen(data.c_str());
-	bool reply = socket.Send(Address(IP_A, IP_B, IP_C, IP_D, PORT), data.c_str(), (int)data_length);
+	int data_length = static_cast<int>(strlen(data.c_str()));
+	bool reply = socket.Send(net::Address(IP_A, IP_B, IP_C, IP_D, PORT), data.c_str(), (int)data_length);
 	return reply;
 }
 
-void write_error(const char arg_path[], const char arg_msg[]){
+/*void write_error(const char arg_path[], const char arg_msg[]){
 	char path[256];
 	//get the time:
 	std::time_t result = std::time(NULL);
@@ -373,5 +381,5 @@ void write_error(const char arg_path[], const char arg_msg[]){
 	sprintf(path, "%s.error.%X", arg_path, (uint32_t)result);
 	std::ofstream file(path);
 	file << arg_msg;
-	file.close();	
-}
+	file.close();
+}*/
