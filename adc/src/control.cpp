@@ -58,6 +58,7 @@
 using namespace std;
 
 uint32_t _sample_rate = (uint32_t)2e5;
+string _uuid = 1;
 
 void stop_recording();
 void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]);
@@ -274,8 +275,7 @@ void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_p
 	munmap(snapshot_space,byte_size);
 }
 
-void start_recording(char arg_device[], uint32_t arg_sample_rate, 
-		char* arg_start_address, char* arg_end_address, int arg_buffer_size){
+void start_recording(char arg_device[], uint32_t arg_sample_rate, char* arg_start_address, char* arg_end_address, int arg_buffer_size){
 
 	_recording = true;
 
@@ -291,7 +291,7 @@ void stop_recording(){
 }
 
 void pipetest()	{
-	printf("Pipe is working, regard C++ program.\n");
+	printf("Pipe is working, regards C++ program.\n");
 }
 
 /*void analyzer()	{
@@ -345,7 +345,7 @@ void stop_continuous_recording()	{
 
 //whole function --mhs
 //If used in thread environment, please lock whole process with mutex!
-bool send_command_start_continuous_recording(char arg_device[], uint32_t arg_sample_rate, char* arg_start_address)	{
+/*bool send_command_start_continuous_recording(char arg_device[], uint32_t arg_sample_rate, char* arg_start_address)	{
 	net::Socket socket; //new socket object
 	if(!socket.Open(PORT))	{ //need to open socket to send
 		printf("control.cpp: failed to create socket\n");
@@ -358,21 +358,33 @@ bool send_command_start_continuous_recording(char arg_device[], uint32_t arg_sam
 	bool reply = socket.Send(net::Address(IP_A, IP_B, IP_C, IP_D, PORT),
 		data.c_str(), (int)data_length);		//sent or not?
 	return reply;		//indicate success
-}
+}*/
 
 //whole function --mhs
-bool send_command_stop_continuous_recording(char arg_device[], char* arg_start_address, char* arg_end_address)	{
+bool send_command_make_metadata(char arg_device[], char* arg_start_address, char* arg_end_address, char* arg_start_time)	{
 	net::Socket socket; 
 	if(!socket.Open(PORT))	{
 		printf("control.cpp: failed to create socket\n");
 		return false;
 	}
-	string data = string(arg_device) + " " + string(arg_start_address) + " " + string(arg_end_address);
+
+	string data = 	string(arg_device) + DGRAM_DELIMITER + 
+					string(arg_start_address) + DGRAM_DELIMITER + 
+					string(arg_end_address)	+ DGRAM_DELIMITER + 
+					string(arg_start_time) + DGRAM_DELIMITER + 
+					_uuid;
+	increment_uuid();
 	int data_length = static_cast<int>(strlen(data.c_str()));
 	bool reply = socket.Send(net::Address(IP_A, IP_B, IP_C, IP_D, PORT), data.c_str(), (int)data_length);
 	return reply;
 }
 
+void increment_uuid()	{
+	unsigned long long num = stoi(_uuid) + 1; // 18 billion billion uuids - ought to be enough --mhs
+	ostringstream convert;
+	convert << num;
+	_uuid = convert.str();
+}
 /*void write_error(const char arg_path[], const char arg_msg[]){
 	char path[256];
 	//get the time:

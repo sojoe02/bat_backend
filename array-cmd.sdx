@@ -119,7 +119,6 @@ my %commands = (
     help => [ \&cmd_help, 0, ],
 	csnap=> [ \&continuoussnap, ],		#--mhs
 	cstop=> [ \&continuoussnap_stop, ],	#--mhs
-	pipetest	=> [ \&pipetest,],		#--mhs
 	);
 
 # The snapshotter program accepts commands given below.  We assume that whenever this script starts there is
@@ -138,7 +137,6 @@ my %snap_cmds = (		# See snapshotter C++ code for more details
     rate => 'set_sr %d',			# Set sample rate <sr[Hz]> (default and max 3[MHz])
 	csnap=> 'continuous_snapshot %Lu %s',	# Start continuous snapshot <from,U64> <path> --mhs
     cstop=> 'continuous_stop %Lu %s',		# Stop continuous snapshot <from,U64> <path>--mhs
-	pipetest => 'pipetest',		# Test if the pipe is working (manual check) --mhs
     );
 
 my $snap_started = 0;		# Is the snapshotter capturing ('start' sent, not 'held')
@@ -1519,9 +1517,6 @@ sub continuoussnap_stop { # Whole subroutine by --mhs, modified from do_snapshot
     # No reply to master - the C++ program waits for 0.5 second for this to finish and closes the recording afterwards
 }
 
-sub pipetest {
-	
-}
 # Rescan the 1-wire bus filesystem
 sub rescan1w {
     my ($from) = @_;
