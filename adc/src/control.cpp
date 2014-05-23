@@ -58,18 +58,18 @@
 using namespace std;
 
 uint32_t _sample_rate = (uint32_t)2e5;
-string _uuid = 1;
+string _uuid = 1; 
 
 void stop_recording();
 void snapshot(uint64_t arg_sample_from, uint64_t arg_sample_to, const char arg_path[]);
 void start_recording(char arg_device[], uint32_t arg_sample_rate, 
 		char* arg_start_address, char* arg_end_address, int arg_buffer_size);
 void write_error(const char arg_msg[], const char arg_path[]);
-void analyzer();
-void start_continuous_recording(char arg_device[], uint32_t arg_sample_rate,
-		char* arg_start_address, int arg_buffer_size);	//--mhs
-void stop_recording(char arg_device[], uint32_t arg_sample_rate, 
-		char* arg_start_address, int arg_buffer_size);	//--mhs
+bool send_command_make_metadata(char[], char*, char*, char*);
+void time_t_2_ascii(char*, time_t);	//--mhs
+void string_2_ascii(char*, string);	//--mhs
+void analyzer();	//--mhs
+
 bool _running = true;
 bool _recording = false;
 bool _continuous_recording = false;
@@ -290,10 +290,6 @@ void stop_recording(){
 	_recording = false;
 }
 
-void pipetest()	{
-	printf("Pipe is working, regards C++ program.\n");
-}
-
 /*void analyzer()	{
 	uint32_t sample_rate = 200000;
 	
@@ -376,14 +372,23 @@ bool send_command_make_metadata(char arg_device[], char* arg_start_address, char
 	increment_uuid();
 	int data_length = static_cast<int>(strlen(data.c_str()));
 	bool reply = socket.Send(net::Address(IP_A, IP_B, IP_C, IP_D, PORT), data.c_str(), (int)data_length);
+	wait(0.5f);
 	return reply;
 }
 
 void increment_uuid()	{
-	unsigned long long num = stoi(_uuid) + 1; // 18 billion billion uuids - ought to be enough --mhs
+	unsigned long long num = stoi(_uuid) + 1; // long long means up 18 billion billion uuids before buffer overrun - ought to be enough --mhs
 	ostringstream convert;
 	convert << num;
 	_uuid = convert.str();
+}
+
+void string_to_char_ptr(char* ptr, string str)	{
+	snprintf(ptr, sizeof(string), "%s", str.c_str());
+}
+
+void time_t_to_char_ptr(char* ptr, time_t t)	{
+	snprintf(ptr, sizeof(time_t), "%ld", t);
 }
 /*void write_error(const char arg_path[], const char arg_msg[]){
 	char path[256];
